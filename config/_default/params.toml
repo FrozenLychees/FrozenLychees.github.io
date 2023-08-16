@@ -14,12 +14,12 @@ lastUpdated = "Aug 16, 2023 20:30 MST"
 
 [sidebar]
 emoji = "🍥"
-subtitle = "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+subtitle = "天天摸鱼身体棒"
 
 [sidebar.avatar]
 enabled = true
 local = true
-src = "img/forzenLychees.png"
+src = "img/forzenLychees.jpg"
 
 [article]
 math = false
