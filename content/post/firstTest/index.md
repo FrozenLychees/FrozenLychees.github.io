@@ -14,6 +14,6 @@ tags:
 
 Welcome to Hugo theme Stack. This is your first post. Edit or delete it, then start writing!
 
-![测试图片](1.png)
+![测试图片](/FrozenLychees.github.io/content/post/firstTest/1.png)
 
 For more information about this theme, check the documentation: https://docs.stack.jimmycai.com/
