@@ -102,7 +102,7 @@ GCoBjcet的实现里面就只有一个CommonHeader，所有需要被GC管理的�
 
 这边再回看一开始的Union Value, GCObject 也被囊括再其中，借用《Lua设计与实现》一书中的图，可以比较清晰的。
 
-![lua对象结构](lua对象结构.png)
+![lua对象结构](lua_object.png)
 
 这边有一个需要修正的，图中的GCHeader在Lua5.4.6中已经不存在了，即GCObject中，第一个字段直接就是CommonHeader.
 
