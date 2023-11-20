@@ -3,7 +3,7 @@ title: Lua 源码阅读笔记-基本类型
 description: 
 slug: 
 date: 2023-09-01 00:00:00+0000
-image: cover.jpg
+image: lua.png
 categories:
     - Lua
 ---
