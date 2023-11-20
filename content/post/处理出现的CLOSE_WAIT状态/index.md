@@ -3,7 +3,7 @@ title: 处理出现的CLOSE_WAIT状态
 description: 
 slug: 
 date: 2023-09-25 00:00:00+0000
-image: cover.jpg
+image: tcp.png
 categories:
     - TCP
 ---
