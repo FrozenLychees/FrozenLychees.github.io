@@ -1,0 +1,186 @@
+<!doctype html><html lang=en-us dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="Git 原理 文章就基于git官方文档的学习笔记，并记录一下在看文档的时候的实验过程，git实验的版本是 git version 2.42.0.windows.1；
+如果内容有问题或者不正确的地方，欢迎留言讨论。
+git初始目录 在执行完git init后，.git目录中包含以下文件
+hooks 用于存放钩子脚本的目录 description 用于GitWeb程序使用，文档上说这边不需要关系，那就先跳过 config 项目特有的配置信息 info 这个目录包含所有不希望记录在.gitignore又需要被忽略的文件 下面四个是比较重要的文件
+HEAD 该文件指向目前所在的分支 index 文件保存暂存区的信息，这个文件在init之初是未被创建的 objects 存储所有的数据信息 refs 存储指向数据的指针 数据对象 git的核心部分可以认为是一个key-vlaue的数据库，在git init初始化的时候，git在objects中创建了两个空的目录，分别是info 和 pack；
+跟这文档，执行下述命令后，返回一个长度40的校验和
+1 2 echo &amp;#34;test first&amp;#34; | git hash-object -w --stdin d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea 这个检验和是SHA-1哈希值，通过要存储的信息和一个header信息做SHA-1校验得到的运算结果。
+命令执行完毕之后，可以看到objects中多了对应的d5文件夹和0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea的文件；可以分析出是用校验和的前两个字符作用目录名，后面38个在字符作为文件名。
+通过下述命令可以从“git数据库”中得到返回对应的内容
+1 2 $ git cat-file -p d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea test first 跟着官网的文档，继续使用git hash-object -w往git数据库插入一些数据
+1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 $ echo &amp;#34;version 1&amp;#34; &amp;gt; test."><title>Git 原理</title>
+<link rel=canonical href=https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/><link rel=stylesheet href=/scss/style.min.abbd69b2908fdfcd5179898beaafd374514a86538d81639ddd2c58c06ae54e40.css><meta property="og:title" content="Git 原理"><meta property="og:description" content="Git 原理 文章就基于git官方文档的学习笔记，并记录一下在看文档的时候的实验过程，git实验的版本是 git version 2.42.0.windows.1；
+如果内容有问题或者不正确的地方，欢迎留言讨论。
+git初始目录 在执行完git init后，.git目录中包含以下文件
+hooks 用于存放钩子脚本的目录 description 用于GitWeb程序使用，文档上说这边不需要关系，那就先跳过 config 项目特有的配置信息 info 这个目录包含所有不希望记录在.gitignore又需要被忽略的文件 下面四个是比较重要的文件
+HEAD 该文件指向目前所在的分支 index 文件保存暂存区的信息，这个文件在init之初是未被创建的 objects 存储所有的数据信息 refs 存储指向数据的指针 数据对象 git的核心部分可以认为是一个key-vlaue的数据库，在git init初始化的时候，git在objects中创建了两个空的目录，分别是info 和 pack；
+跟这文档，执行下述命令后，返回一个长度40的校验和
+1 2 echo &amp;#34;test first&amp;#34; | git hash-object -w --stdin d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea 这个检验和是SHA-1哈希值，通过要存储的信息和一个header信息做SHA-1校验得到的运算结果。
+命令执行完毕之后，可以看到objects中多了对应的d5文件夹和0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea的文件；可以分析出是用校验和的前两个字符作用目录名，后面38个在字符作为文件名。
+通过下述命令可以从“git数据库”中得到返回对应的内容
+1 2 $ git cat-file -p d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea test first 跟着官网的文档，继续使用git hash-object -w往git数据库插入一些数据
+1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 $ echo &amp;#34;version 1&amp;#34; &amp;gt; test."><meta property="og:url" content="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/"><meta property="og:site_name" content="FrozenLychees"><meta property="og:type" content="article"><meta property="article:section" content="Post"><meta property="article:published_time" content="2023-12-01T00:00:00+00:00"><meta property="article:modified_time" content="2023-12-01T00:00:00+00:00"><meta property="og:image" content="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit.png"><meta name=twitter:title content="Git 原理"><meta name=twitter:description content="Git 原理 文章就基于git官方文档的学习笔记，并记录一下在看文档的时候的实验过程，git实验的版本是 git version 2.42.0.windows.1；
+如果内容有问题或者不正确的地方，欢迎留言讨论。
+git初始目录 在执行完git init后，.git目录中包含以下文件
+hooks 用于存放钩子脚本的目录 description 用于GitWeb程序使用，文档上说这边不需要关系，那就先跳过 config 项目特有的配置信息 info 这个目录包含所有不希望记录在.gitignore又需要被忽略的文件 下面四个是比较重要的文件
+HEAD 该文件指向目前所在的分支 index 文件保存暂存区的信息，这个文件在init之初是未被创建的 objects 存储所有的数据信息 refs 存储指向数据的指针 数据对象 git的核心部分可以认为是一个key-vlaue的数据库，在git init初始化的时候，git在objects中创建了两个空的目录，分别是info 和 pack；
+跟这文档，执行下述命令后，返回一个长度40的校验和
+1 2 echo &amp;#34;test first&amp;#34; | git hash-object -w --stdin d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea 这个检验和是SHA-1哈希值，通过要存储的信息和一个header信息做SHA-1校验得到的运算结果。
+命令执行完毕之后，可以看到objects中多了对应的d5文件夹和0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea的文件；可以分析出是用校验和的前两个字符作用目录名，后面38个在字符作为文件名。
+通过下述命令可以从“git数据库”中得到返回对应的内容
+1 2 $ git cat-file -p d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea test first 跟着官网的文档，继续使用git hash-object -w往git数据库插入一些数据
+1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 $ echo &amp;#34;version 1&amp;#34; &amp;gt; test."><meta name=twitter:card content="summary_large_image"><meta name=twitter:image content="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit.png"><link rel="shortcut icon" href=/favicon.png><script async src="https://www.googletagmanager.com/gtag/js?id=G-KCSZNN6B9X"></script><script>var doNotTrack=!1;if(!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-KCSZNN6B9X",{anonymize_ip:!1})}</script></head><body class=article-page><script>(function(){const e="StackColorScheme";localStorage.getItem(e)||localStorage.setItem(e,"auto")})()</script><script>(function(){const t="StackColorScheme",e=localStorage.getItem(t),n=window.matchMedia("(prefers-color-scheme: dark)").matches===!0;e=="dark"||e==="auto"&&n?document.documentElement.dataset.scheme="dark":document.documentElement.dataset.scheme="light"})()</script><div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky"><button class="hamburger hamburger--spin" type=button id=toggle-menu aria-label="Toggle Menu">
+<span class=hamburger-box><span class=hamburger-inner></span></span></button><header><figure class=site-avatar><a href=/><img src=/img/forzenLychees_hu37a7bdcb42ab612cba5e97cb656326c4_12028_300x0_resize_q75_box.jpg width=300 height=300 class=site-logo loading=lazy alt=Avatar>
+</a><span class=emoji>🍥</span></figure><div class=site-meta><h1 class=site-name><a href=/>FrozenLychees</a></h1><h2 class=site-description>天天摸鱼身体棒</h2></div></header><ol class=social-menu><li><a href=https://github.com/FrozenLychees target=_blank title=GitHub rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6.0 00-1.3-3.2 4.2 4.2.0 00-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3.0 00-6.2.0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2.0 00-.1 3.2A4.6 4.6.0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a></li><li><a href=https://twitter.com target=_blank title=Twitter rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-1.265-2.783-1.335-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84.0 00.497-3.753C20.18 7.773 21.692 5.25 22 4.009z"/></svg></a></li></ol><ol class=menu id=main-menu><li><a href=/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/><path d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"/></svg><span>Home</span></a></li><li><a href=/archives/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><rect x="3" y="4" width="18" height="4" rx="2"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg><span>Archives</span></a></li><li><a href=/search/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg><span>Search</span></a></li><li><a href=/links/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 14a3.5 3.5.0 005 0l4-4a3.5 3.5.0 00-5-5l-.5.5"/><path d="M14 10a3.5 3.5.0 00-5 0l-4 4a3.5 3.5.0 005 5l.5-.5"/></svg><span>Links</span></a></li><div class=menu-bottom-section><li id=dark-mode-toggle><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="8" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="16" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg><span>Dark Mode</span></li></div></ol></aside><aside class="sidebar right-sidebar sticky"><section class="widget archives"><div class=widget-icon><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="11" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="13" y2="20"/></svg></div><h2 class="widget-title section-title">Table of contents</h2><div class=widget--toc><nav id=TableOfContents><ol><li><a href=#git初始目录>git初始目录</a></li><li><a href=#数据对象>数据对象</a></li><li><a href=#树对象>树对象</a></li><li><a href=#提交对象>提交对象</a></li><li><a href=#对象存储>对象存储</a></li><li><a href=#引用>引用</a></li></ol></nav></div></section></aside><main class="main full-width"><article class="has-image main-article"><header class=article-header><div class=article-image><a href=/p/git-%E5%8E%9F%E7%90%86/><img src=/p/git-%E5%8E%9F%E7%90%86/commit_hu37f5b046beb96c58f0533948a05397b9_63983_800x0_resize_box_3.png srcset="/p/git-%E5%8E%9F%E7%90%86/commit_hu37f5b046beb96c58f0533948a05397b9_63983_800x0_resize_box_3.png 800w, /p/git-%E5%8E%9F%E7%90%86/commit_hu37f5b046beb96c58f0533948a05397b9_63983_1600x0_resize_box_3.png 1600w" width=800 height=595 loading=lazy alt="Featured image of post Git 原理"></a></div><div class=article-details><header class=article-category><a href=/categories/git/>Git</a></header><div class=article-title-wrapper><h2 class=article-title><a href=/p/git-%E5%8E%9F%E7%90%86/>Git 原理</a></h2></div><footer class=article-time><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M11.795 21H5a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v4"/><circle cx="18" cy="18" r="4"/><path d="M15 3v4"/><path d="M7 3v4"/><path d="M3 11h16"/><path d="M18 16.496V18l1 1"/></svg><time class=article-time--published>Aug 126, 10112</time></div><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg><time class=article-time--reading>2 minute read</time></div></footer></div></header><section class=article-content><h1 id=git-原理>Git 原理</h1><p>文章就基于git官方文档的学习笔记，并记录一下在看文档的时候的实验过程，git实验的版本是 git version 2.42.0.windows.1；</p><p>如果内容有问题或者不正确的地方，欢迎留言讨论。</p><h2 id=git初始目录>git初始目录</h2><p>在执行完git init后，.git目录中包含以下文件</p><ul><li>hooks 用于存放钩子脚本的目录</li><li>description 用于GitWeb程序使用，文档上说这边不需要关系，那就先跳过</li><li>config 项目特有的配置信息</li><li>info 这个目录包含所有不希望记录在.gitignore又需要被忽略的文件</li></ul><p>下面四个是比较重要的文件</p><ul><li>HEAD 该文件指向目前所在的分支</li><li>index 文件保存暂存区的信息，这个文件在init之初是未被创建的</li><li>objects 存储所有的数据信息</li><li>refs 存储指向数据的指针</li></ul><h2 id=数据对象>数据对象</h2><p>git的核心部分可以认为是一个key-vlaue的数据库，在git init初始化的时候，git在objects中创建了两个空的目录，分别是info 和 pack；</p><p>跟这文档，执行下述命令后，返回一个长度40的校验和</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>echo &#34;test first&#34; | git hash-object -w --stdin
+</span></span><span class=line><span class=cl>d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+</span></span></code></pre></td></tr></table></div></div><p>这个检验和是SHA-1哈希值，通过要存储的信息和一个header信息做SHA-1校验得到的运算结果。</p><p>命令执行完毕之后，可以看到objects中多了对应的d5文件夹和0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea的文件；可以分析出是用校验和的前两个字符作用目录名，后面38个在字符作为文件名。</p><p>通过下述命令可以从“git数据库”中得到返回对应的内容</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ git cat-file -p d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+</span></span><span class=line><span class=cl>test first
+</span></span></code></pre></td></tr></table></div></div><p>跟着官网的文档，继续使用git hash-object -w往git数据库插入一些数据</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ echo &#34;version 1&#34; &gt; test.txt
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>$ git hash-object -w test.txt
+</span></span><span class=line><span class=cl>83baae61804e65cc73a7201a7252750c76066a30
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>$ find .git/objects/ -type f
+</span></span><span class=line><span class=cl>.git/objects/83/baae61804e65cc73a7201a7252750c76066a30
+</span></span><span class=line><span class=cl>.git/objects/d5/0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>echo &#34;version 2&#34; &gt; test.txt
+</span></span><span class=line><span class=cl>$ git hash-object -w test.txt
+</span></span><span class=line><span class=cl>1f7a7a472abf3dd9643fd615f6da379c4acb3e3a
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>$ find .git/objects -type f
+</span></span><span class=line><span class=cl>.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a
+</span></span><span class=line><span class=cl>.git/objects/83/baae61804e65cc73a7201a7252750c76066a30
+</span></span><span class=line><span class=cl>.git/objects/d5/0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+</span></span></code></pre></td></tr></table></div></div><p>使用这个方式插入数据的时候，可以看到git status等正常方式是不会有改变的</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ git status
+</span></span><span class=line><span class=cl>On branch master
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>No commits yet
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>Untracked files:
+</span></span><span class=line><span class=cl>  (use &#34;git add &lt;file&gt;...&#34; to include in what will be committed)
+</span></span><span class=line><span class=cl>        test.txt
+</span></span></code></pre></td></tr></table></div></div><p>这种方式直接通过git hash-object -w插入的数被称为 数据对象（blob objects），它没有存储对应的文件名字等信息</p><p>通过git cat-file -t 命令可以看到git存储的内部对象类型</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ git cat-file -t 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a
+</span></span><span class=line><span class=cl>blob
+</span></span></code></pre></td></tr></table></div></div><h2 id=树对象>树对象</h2><p>树对象的存在是为了解决数据对象中没有名字的问题；</p><p>使用下面的一系列命令创建出一个树对象</p><p>首先是提交文件到暂存区</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ git update-index --add --cacheinfo 100644 83baae61804e65cc73a7201a7252750c76066a30 test.txt
+</span></span></code></pre></td></tr></table></div></div><p>其中</p><ul><li>&ndash;add是因为这个文件需要首次加入到暂存区；</li><li>&ndash;cacheinfo 是因为对应的对象是在之前加入到git 数据库中的，而不是目录下的文件；</li><li>100644 表明加入的是一个普通文件，其他还有选项如10755之类的，具体看官网</li><li>test.txt是文件名；</li></ul><p>提交完毕后通过git write-tree 来创建出对应的树对象</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ git write-tree 83baae61804e65cc73a7201a7252750c76066a30
+</span></span><span class=line><span class=cl>d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>$ git cat-file -p d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+</span></span><span class=line><span class=cl>100644 blob 83baae61804e65cc73a7201a7252750c76066a30    test.txt
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>$ git cat-file -t d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+</span></span><span class=line><span class=cl>tree
+</span></span></code></pre></td></tr></table></div></div><p>可以看到这个树对象的内容就是之前输入到暂存区的参数；</p><p>接下来跟着官网实例为test.txt创建新的版本，和新的文件</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ git update-index --add --cacheinfo 100644 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a test.txt
+</span></span><span class=line><span class=cl>$ echo &#34;new file&#34; &gt; new.txt
+</span></span><span class=line><span class=cl>$ git update-index --add new.txt
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>$ git write-tree
+</span></span><span class=line><span class=cl>0155eb4229851634a0f03eb265b69f5a2d56f341
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>$ git cat-file -p 0155eb4229851634a0f03eb265b69f5a2d56f341
+</span></span><span class=line><span class=cl>100644 blob fa49b077972391ad58037050f2a75f74e3671e92    new.txt
+</span></span><span class=line><span class=cl>100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a    test.txt
+</span></span></code></pre></td></tr></table></div></div><p>在这次的提交中，可以看到生成的树对象内容包含了这次的修改的数据对象指针以及文件内容</p><p>将之前的树节点读取出来然后提交</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ git read-tree --prefix=bak d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+</span></span><span class=line><span class=cl>$ git write-tree
+</span></span><span class=line><span class=cl>3c4e9cd789d88d8d89c1073707c3585e41b0e614
+</span></span><span class=line><span class=cl>$ git cat-file -p 3c4e9cd789d88d8d89c1073707c3585e41b0e614
+</span></span><span class=line><span class=cl>040000 tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579      bak
+</span></span><span class=line><span class=cl>100644 blob fa49b077972391ad58037050f2a75f74e3671e92      new.txt
+</span></span><span class=line><span class=cl>100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a      test.txt
+</span></span></code></pre></td></tr></table></div></div><p><img src=/p/git-%E5%8E%9F%E7%90%86/treeObject.png width=800 height=593 srcset="/p/git-%E5%8E%9F%E7%90%86/treeObject_hu95300c5ad498310f15fc7319472d8b91_52709_480x0_resize_box_3.png 480w, /p/git-%E5%8E%9F%E7%90%86/treeObject_hu95300c5ad498310f15fc7319472d8b91_52709_1024x0_resize_box_3.png 1024w" loading=lazy class=gallery-image data-flex-grow=134 data-flex-basis=323px>
+到这边我才发现，我的SHA-1内容和官方示例是一样的，不过也确实，因为校验和是根据内容生成的，内容一致，所以结果也一样。</p><p>做到这边我的疑惑是为什么第三步读入树对象了之后，在git write-tree之后会有new.txt和test.txt；我这边以为git write-tree是对应git commit， 会将暂存区清空的；但后面发现官网文档上有说明git write-tree 只是将当前暂存区对象打包成一个树对象，不会改成暂存区；</p><h2 id=提交对象>提交对象</h2><p>提交对象的目的是为了保存什么时候、为什么提交快照信息；</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ echo &#34;first commit&#34; | git commit-tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+</span></span><span class=line><span class=cl>3d892437b4885956efeece70e6264534b1aa1785
+</span></span></code></pre></td></tr></table></div></div><p>文档还很贴切的在这提示了说因为时间不同，得到的会是不同的SHA-1值</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ git cat-file -p fdf4fc3
+</span></span><span class=line><span class=cl>tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+</span></span><span class=line><span class=cl>author Scott Chacon &lt;schacon@gmail.com&gt; 1243040974 -0700
+</span></span><span class=line><span class=cl>committer Scott Chacon &lt;schacon@gmail.com&gt; 1243040974 -0700
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>first commit
+</span></span></code></pre></td></tr></table></div></div><p>这边按文档的例子来解释，提交对象的头部是一个树对象的SHA, 然后是作者信息，最后是提交注释</p><p>通过git log &ndash;stat 就可以看到一个完整的提交记录</p><p>如果继续把上述的树对象都提交了，后续的提交需要指定前一个提交作为父对象</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>$ echo &#39;second commit&#39; | git commit-tree 0155eb -p 3d892437
+</span></span><span class=line><span class=cl>80869a3e49b9078e1152d6ab8cf14b332e0cac69
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>$ echo &#39;third commit&#39;  | git commit-tree 3c4e9c -p 80869a3e
+</span></span><span class=line><span class=cl>55ab56f172e9224cc3ed302ff7f74da514d27e11
+</span></span></code></pre></td></tr></table></div></div><p>最后的结果应该是和文档的图是一致的
+<img src=/p/git-%E5%8E%9F%E7%90%86/commit.png width=800 height=595 srcset="/p/git-%E5%8E%9F%E7%90%86/commit_hu37f5b046beb96c58f0533948a05397b9_63983_480x0_resize_box_3.png 480w, /p/git-%E5%8E%9F%E7%90%86/commit_hu37f5b046beb96c58f0533948a05397b9_63983_1024x0_resize_box_3.png 1024w" loading=lazy class=gallery-image data-flex-grow=134 data-flex-basis=322px></p><h2 id=对象存储>对象存储</h2><p>git对象的SHA-1 是通过一个header + content组成的；</p><p>content就是文档内容，而header是通过content的类型和长度生成的，最后将header + content拼接在一起后进行SHA-1得到最后的校验合。
+而content在存储之前会经过zlib压缩。</p><p>最后存储到文件的时候就是SHA-1作为文件名，zlib压缩的content作为文件内容</p><h2 id=引用>引用</h2><ol><li><a class=link href=https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-%E5%BA%95%E5%B1%82%E5%91%BD%E4%BB%A4%E4%B8%8E%E4%B8%8A%E5%B1%82%E5%91%BD%E4%BB%A4 target=_blank rel=noopener>https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-%E5%BA%95%E5%B1%82%E5%91%BD%E4%BB%A4%E4%B8%8E%E4%B8%8A%E5%B1%82%E5%91%BD%E4%BB%A4</a></li><li><a class=link href=https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-Git-%E5%AF%B9%E8%B1%A1 target=_blank rel=noopener>https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-Git-%E5%AF%B9%E8%B1%A1</a></li></ol></section><footer class=article-footer><section class=article-copyright><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><path d="M14.5 9a3.5 4 0 100 6"/></svg><span>Licensed under CC BY-NC-SA 4.0</span></section></footer></article><script src=https://utteranc.es/client.js repo=FrozenLychees/FrozenLychees.github.io issue-term=pathname label=comments crossorigin=anonymous async></script><style>.utterances{max-width:unset}</style><script>let utterancesLoaded=!1;function setUtterancesTheme(e){let t=document.querySelector(".utterances iframe");t&&t.contentWindow.postMessage({type:"set-theme",theme:`github-${e}`},"https://utteranc.es")}addEventListener("message",e=>{if(e.origin!=="https://utteranc.es")return;utterancesLoaded=!0,setUtterancesTheme(document.documentElement.dataset.scheme)}),window.addEventListener("onColorSchemeChange",e=>{if(!utterancesLoaded)return;setUtterancesTheme(e.detail)})</script><footer class=site-footer><section class=copyright>&copy;
+2020 -
+2023 FrozenLychees</section><section class=powerby>Built with <a href=https://gohugo.io/ target=_blank rel=noopener>Hugo</a><br>Theme <b><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank rel=noopener data-version=3.21.0>Stack</a></b> designed by <a href=https://jimmycai.com target=_blank rel=noopener>Jimmy</a></section></footer><div class=pswp tabindex=-1 role=dialog aria-hidden=true><div class=pswp__bg></div><div class=pswp__scroll-wrap><div class=pswp__container><div class=pswp__item></div><div class=pswp__item></div><div class=pswp__item></div></div><div class="pswp__ui pswp__ui--hidden"><div class=pswp__top-bar><div class=pswp__counter></div><button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+<button class="pswp__button pswp__button--share" title=Share></button>
+<button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+<button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button><div class=pswp__preloader><div class=pswp__preloader__icn><div class=pswp__preloader__cut><div class=pswp__preloader__donut></div></div></div></div></div><div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap"><div class=pswp__share-tooltip></div></div><button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+</button>
+<button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)"></button><div class=pswp__caption><div class=pswp__caption__center></div></div></div></div></div><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo=" crossorigin=anonymous defer></script><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU=" crossorigin=anonymous defer></script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css crossorigin=anonymous><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css crossorigin=anonymous></main></div><script src=https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z+KMkF24hUW8WePSA9HM=" crossorigin=anonymous></script><script type=text/javascript src=/ts/main.js defer></script><script>(function(){const e=document.createElement("link");e.href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap",e.type="text/css",e.rel="stylesheet",document.head.appendChild(e)})()</script></body></html>

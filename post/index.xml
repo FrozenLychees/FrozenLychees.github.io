@@ -1,0 +1,1349 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Posts on FrozenLychees</title><link>https://frozenlychees.github.io/post/</link><description>Recent content in Posts on FrozenLychees</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Fri, 01 Dec 2023 00:00:00 +0000</lastBuildDate><atom:link href="https://frozenlychees.github.io/post/index.xml" rel="self" type="application/rss+xml"/><item><title>Git 原理</title><link>https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/</link><pubDate>Fri, 01 Dec 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/</guid><description>&lt;img src="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit.png" alt="Featured image of post Git 原理" />&lt;h1 id="git-原理">Git 原理&lt;/h1>
+&lt;p>文章就基于git官方文档的学习笔记，并记录一下在看文档的时候的实验过程，git实验的版本是 git version 2.42.0.windows.1；&lt;/p>
+&lt;p>如果内容有问题或者不正确的地方，欢迎留言讨论。&lt;/p>
+&lt;h2 id="git初始目录">git初始目录&lt;/h2>
+&lt;p>在执行完git init后，.git目录中包含以下文件&lt;/p>
+&lt;ul>
+&lt;li>hooks 用于存放钩子脚本的目录&lt;/li>
+&lt;li>description 用于GitWeb程序使用，文档上说这边不需要关系，那就先跳过&lt;/li>
+&lt;li>config 项目特有的配置信息&lt;/li>
+&lt;li>info 这个目录包含所有不希望记录在.gitignore又需要被忽略的文件&lt;/li>
+&lt;/ul>
+&lt;p>下面四个是比较重要的文件&lt;/p>
+&lt;ul>
+&lt;li>HEAD 该文件指向目前所在的分支&lt;/li>
+&lt;li>index 文件保存暂存区的信息，这个文件在init之初是未被创建的&lt;/li>
+&lt;li>objects 存储所有的数据信息&lt;/li>
+&lt;li>refs 存储指向数据的指针&lt;/li>
+&lt;/ul>
+&lt;h2 id="数据对象">数据对象&lt;/h2>
+&lt;p>git的核心部分可以认为是一个key-vlaue的数据库，在git init初始化的时候，git在objects中创建了两个空的目录，分别是info 和 pack；&lt;/p>
+&lt;p>跟这文档，执行下述命令后，返回一个长度40的校验和&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">echo &amp;#34;test first&amp;#34; | git hash-object -w --stdin
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这个检验和是SHA-1哈希值，通过要存储的信息和一个header信息做SHA-1校验得到的运算结果。&lt;/p>
+&lt;p>命令执行完毕之后，可以看到objects中多了对应的d5文件夹和0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea的文件；可以分析出是用校验和的前两个字符作用目录名，后面38个在字符作为文件名。&lt;/p>
+&lt;p>通过下述命令可以从“git数据库”中得到返回对应的内容&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git cat-file -p d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">test first
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>跟着官网的文档，继续使用git hash-object -w往git数据库插入一些数据&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ echo &amp;#34;version 1&amp;#34; &amp;gt; test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git hash-object -w test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">83baae61804e65cc73a7201a7252750c76066a30
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ find .git/objects/ -type f
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/83/baae61804e65cc73a7201a7252750c76066a30
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/d5/0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">echo &amp;#34;version 2&amp;#34; &amp;gt; test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git hash-object -w test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">1f7a7a472abf3dd9643fd615f6da379c4acb3e3a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ find .git/objects -type f
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/83/baae61804e65cc73a7201a7252750c76066a30
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/d5/0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>使用这个方式插入数据的时候，可以看到git status等正常方式是不会有改变的&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;span class="lnt">8
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git status
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">On branch master
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">No commits yet
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Untracked files:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> (use &amp;#34;git add &amp;lt;file&amp;gt;...&amp;#34; to include in what will be committed)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> test.txt
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这种方式直接通过git hash-object -w插入的数被称为 数据对象（blob objects），它没有存储对应的文件名字等信息&lt;/p>
+&lt;p>通过git cat-file -t 命令可以看到git存储的内部对象类型&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git cat-file -t 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">blob
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="树对象">树对象&lt;/h2>
+&lt;p>树对象的存在是为了解决数据对象中没有名字的问题；&lt;/p>
+&lt;p>使用下面的一系列命令创建出一个树对象&lt;/p>
+&lt;p>首先是提交文件到暂存区&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git update-index --add --cacheinfo 100644 83baae61804e65cc73a7201a7252750c76066a30 test.txt
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>其中&lt;/p>
+&lt;ul>
+&lt;li>&amp;ndash;add是因为这个文件需要首次加入到暂存区；&lt;/li>
+&lt;li>&amp;ndash;cacheinfo 是因为对应的对象是在之前加入到git 数据库中的，而不是目录下的文件；&lt;/li>
+&lt;li>100644 表明加入的是一个普通文件，其他还有选项如10755之类的，具体看官网&lt;/li>
+&lt;li>test.txt是文件名；&lt;/li>
+&lt;/ul>
+&lt;p>提交完毕后通过git write-tree 来创建出对应的树对象&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;span class="lnt">8
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git write-tree 83baae61804e65cc73a7201a7252750c76066a30
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git cat-file -p d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob 83baae61804e65cc73a7201a7252750c76066a30 test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git cat-file -t d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">tree
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>可以看到这个树对象的内容就是之前输入到暂存区的参数；&lt;/p>
+&lt;p>接下来跟着官网实例为test.txt创建新的版本，和新的文件&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git update-index --add --cacheinfo 100644 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ echo &amp;#34;new file&amp;#34; &amp;gt; new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git update-index --add new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git write-tree
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">0155eb4229851634a0f03eb265b69f5a2d56f341
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git cat-file -p 0155eb4229851634a0f03eb265b69f5a2d56f341
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob fa49b077972391ad58037050f2a75f74e3671e92 new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a test.txt
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>在这次的提交中，可以看到生成的树对象内容包含了这次的修改的数据对象指针以及文件内容&lt;/p>
+&lt;p>将之前的树节点读取出来然后提交&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git read-tree --prefix=bak d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git write-tree
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">3c4e9cd789d88d8d89c1073707c3585e41b0e614
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git cat-file -p 3c4e9cd789d88d8d89c1073707c3585e41b0e614
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">040000 tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579 bak
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob fa49b077972391ad58037050f2a75f74e3671e92 new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a test.txt
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>&lt;img src="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/treeObject.png"
+width="800"
+height="593"
+srcset="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/treeObject_hu95300c5ad498310f15fc7319472d8b91_52709_480x0_resize_box_3.png 480w, https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/treeObject_hu95300c5ad498310f15fc7319472d8b91_52709_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="134"
+data-flex-basis="323px"
+>
+到这边我才发现，我的SHA-1内容和官方示例是一样的，不过也确实，因为校验和是根据内容生成的，内容一致，所以结果也一样。&lt;/p>
+&lt;p>做到这边我的疑惑是为什么第三步读入树对象了之后，在git write-tree之后会有new.txt和test.txt；我这边以为git write-tree是对应git commit， 会将暂存区清空的；但后面发现官网文档上有说明git write-tree 只是将当前暂存区对象打包成一个树对象，不会改成暂存区；&lt;/p>
+&lt;h2 id="提交对象">提交对象&lt;/h2>
+&lt;p>提交对象的目的是为了保存什么时候、为什么提交快照信息；&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ echo &amp;#34;first commit&amp;#34; | git commit-tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">3d892437b4885956efeece70e6264534b1aa1785
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>文档还很贴切的在这提示了说因为时间不同，得到的会是不同的SHA-1值&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git cat-file -p fdf4fc3
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">author Scott Chacon &amp;lt;schacon@gmail.com&amp;gt; 1243040974 -0700
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">committer Scott Chacon &amp;lt;schacon@gmail.com&amp;gt; 1243040974 -0700
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">first commit
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这边按文档的例子来解释，提交对象的头部是一个树对象的SHA, 然后是作者信息，最后是提交注释&lt;/p>
+&lt;p>通过git log &amp;ndash;stat &lt;!-- raw HTML omitted --> 就可以看到一个完整的提交记录&lt;/p>
+&lt;p>如果继续把上述的树对象都提交了，后续的提交需要指定前一个提交作为父对象&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ echo &amp;#39;second commit&amp;#39; | git commit-tree 0155eb -p 3d892437
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">80869a3e49b9078e1152d6ab8cf14b332e0cac69
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ echo &amp;#39;third commit&amp;#39; | git commit-tree 3c4e9c -p 80869a3e
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">55ab56f172e9224cc3ed302ff7f74da514d27e11
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>最后的结果应该是和文档的图是一致的
+&lt;img src="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit.png"
+width="800"
+height="595"
+srcset="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit_hu37f5b046beb96c58f0533948a05397b9_63983_480x0_resize_box_3.png 480w, https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit_hu37f5b046beb96c58f0533948a05397b9_63983_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="134"
+data-flex-basis="322px"
+>&lt;/p>
+&lt;h2 id="对象存储">对象存储&lt;/h2>
+&lt;p>git对象的SHA-1 是通过一个header + content组成的；&lt;/p>
+&lt;p>content就是文档内容，而header是通过content的类型和长度生成的，最后将header + content拼接在一起后进行SHA-1得到最后的校验合。
+而content在存储之前会经过zlib压缩。&lt;/p>
+&lt;p>最后存储到文件的时候就是SHA-1作为文件名，zlib压缩的content作为文件内容&lt;/p>
+&lt;h2 id="引用">引用&lt;/h2>
+&lt;ol>
+&lt;li>&lt;a class="link" href="https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-%E5%BA%95%E5%B1%82%E5%91%BD%E4%BB%A4%E4%B8%8E%E4%B8%8A%E5%B1%82%E5%91%BD%E4%BB%A4" target="_blank" rel="noopener"
+>https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-%E5%BA%95%E5%B1%82%E5%91%BD%E4%BB%A4%E4%B8%8E%E4%B8%8A%E5%B1%82%E5%91%BD%E4%BB%A4&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-Git-%E5%AF%B9%E8%B1%A1" target="_blank" rel="noopener"
+>https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-Git-%E5%AF%B9%E8%B1%A1&lt;/a>&lt;/li>
+&lt;/ol></description></item><item><title>Lua 源码阅读笔记-chunk 加载相关</title><link>https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-chunk-%E5%8A%A0%E8%BD%BD%E7%9B%B8%E5%85%B3/</link><pubDate>Tue, 21 Nov 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-chunk-%E5%8A%A0%E8%BD%BD%E7%9B%B8%E5%85%B3/</guid><description>&lt;img src="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-chunk-%E5%8A%A0%E8%BD%BD%E7%9B%B8%E5%85%B3/lua.png" alt="Featured image of post Lua 源码阅读笔记-chunk 加载相关" />&lt;h1 id="lua-源码阅读笔记-加载chunk">Lua 源码阅读笔记-加载chunk&lt;/h1>
+&lt;p>lua版本基于5.4.6， 文章更多是记录自己在阅读的是思绪，而非科普。
+如果内容有问题或者不正确的地方，欢迎留言讨论。&lt;/p>
+&lt;h2 id="大致流程">大致流程&lt;/h2>
+&lt;p>在Python中，当python虚拟机执行py脚本的时候，会先将py脚本编译成pyc（实际上就是字节码的集合），然后虚拟机加载对应的字节码开始工作。这个流程在lua中也是一样的，lua解释器会将lua源码编译成所谓的chunk，然后加载这个chunk进行解释工作，只是一般情况下，chunk文件没有保存在本地。lua提供luac的方式手动将源码编译成二进制的chunk文件并保存。&lt;/p>
+&lt;h2 id="chunk">Chunk&lt;/h2>
+&lt;p>Chunk貌似就是类似pyc一样的文件，包含了运行的字节码、版本信息等&lt;/p>
+&lt;h2 id="load-chunk">load chunk&lt;/h2>
+&lt;p>从加载chunk开始 稍微往下跟一下，加载chunk的函数是lua_load&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">LUA_API&lt;/span> &lt;span class="ne">int&lt;/span> &lt;span class="n">lua_load&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">lua_State&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">lua_Reader&lt;/span> &lt;span class="n">reader&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">data&lt;/span>&lt;span class="p">,&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">chunkname&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">mode&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="o">!&lt;/span>&lt;span class="n">chunkname&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="n">chunkname&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="s2">&amp;#34;?&amp;#34;&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">luaZ_init&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">z&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">reader&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">data&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">status&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">luaD_protectedparser&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">z&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">chunkname&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">mode&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">status&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="n">LUA_OK&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">no&lt;/span> &lt;span class="n">errors&lt;/span>&lt;span class="err">?&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">lua_unlock&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">status&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="ne">int&lt;/span> &lt;span class="n">luaD_protectedparser&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">lua_State&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">ZIO&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">z&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">mode&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">SParser&lt;/span> &lt;span class="n">p&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">status&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">luaZ_initbuffer&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">p&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">buff&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">status&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">luaD_pcall&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">f_parser&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">p&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">savestack&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">L&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">top&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">p&lt;/span>&lt;span class="p">),&lt;/span> &lt;span class="n">L&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">errfunc&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">status&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>可以看到缩减之后，函数本质是调用了luaD_protectedparser这个函数，而luaD_protectedparser中通过luaD_pcall进行了一系列的操作。&lt;/p>
+&lt;p>luaD_pcall这个函数在源码中的定义如下&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="o">**&lt;/span> &lt;span class="n">Call&lt;/span> &lt;span class="n">the&lt;/span> &lt;span class="n">C&lt;/span> &lt;span class="n">function&lt;/span> &lt;span class="s1">&amp;#39;func&amp;#39;&lt;/span> &lt;span class="ow">in&lt;/span> &lt;span class="n">protected&lt;/span> &lt;span class="n">mode&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">restoring&lt;/span> &lt;span class="n">basic&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">**&lt;/span> &lt;span class="n">thread&lt;/span> &lt;span class="n">information&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="s1">&amp;#39;allowhook&amp;#39;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">etc&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="ow">and&lt;/span> &lt;span class="ow">in&lt;/span> &lt;span class="n">particular&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">**&lt;/span> &lt;span class="n">its&lt;/span> &lt;span class="n">stack&lt;/span> &lt;span class="n">level&lt;/span> &lt;span class="ow">in&lt;/span> &lt;span class="k">case&lt;/span> &lt;span class="n">of&lt;/span> &lt;span class="n">errors&lt;/span>&lt;span class="o">.&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="ne">int&lt;/span> &lt;span class="n">luaD_pcall&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">lua_State&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">Pfunc&lt;/span> &lt;span class="k">func&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">u&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">ptrdiff_t&lt;/span> &lt;span class="n">old_top&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">ptrdiff_t&lt;/span> &lt;span class="n">ef&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>看起来就是通过 lua 虚拟机的操作来 “安全的” 调用 一个Pfunc，保证出现异常的时候不会直接挂掉. 这边先不深入这个函数，后面应该还会遇到它很多次&lt;/p>
+&lt;p>回到luaD_protectedparser，可以看到调用的函数是f_parser。&lt;/p>
+&lt;h2 id="f_parser">f_parser&lt;/h2>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">static void f_parser (lua_State *L, void *ud) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> LClosure *cl;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct SParser *p = cast(struct SParser *, ud);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int c = zgetc(p-&amp;gt;z); /* read first character */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (c == LUA_SIGNATURE[0]) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> checkmode(L, p-&amp;gt;mode, &amp;#34;binary&amp;#34;);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> cl = luaU_undump(L, p-&amp;gt;z, p-&amp;gt;name);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> else {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> checkmode(L, p-&amp;gt;mode, &amp;#34;text&amp;#34;);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> cl = luaY_parser(L, p-&amp;gt;z, &amp;amp;p-&amp;gt;buff, &amp;amp;p-&amp;gt;dyd, p-&amp;gt;name, c);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lua_assert(cl-&amp;gt;nupvalues == cl-&amp;gt;p-&amp;gt;sizeupvalues);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> luaF_initupvals(L, cl);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这个函数很短，这个cast宏可以看作是一个构造函数，构造出Sparse这个对象，实际上这边传入的是luaD_protectedparser 函数的那个栈变量p；&lt;/p>
+&lt;p>通过这个p的checkmode函数来检查加载的文件和加载的方式是否匹配，并调用不同的函数构造出LClosure，设置到对应的虚拟机中，这边构造出的LClosure应该是一个最外层的Lua闭包。&lt;/p>
+&lt;p>具体的parse部分目前先不深究了，对于语法、词法分析相关的基础知识还差太多了，等以后有空再补。&lt;/p>
+&lt;p>闭包这个概念在Lua中应该是需要花一整个篇幅来阅读的，这边写不展开看了。&lt;/p>
+&lt;h2 id="小结">小结&lt;/h2>
+&lt;p>从load chunk开始一层层往下，基本上可以确定Lua从给定的名字和打开方式中解析出一个闭包，然后设置到对应的虚拟机对象中，这样后面Lua虚拟机就可以根据这闭包执行对应的字节码了。&lt;/p>
+&lt;h2 id="引用">引用&lt;/h2>
+&lt;p>&lt;a class="link" href="https://yuerer.com/Lua5.3-%E8%AE%BE%E8%AE%A1%E5%AE%9E%E7%8E%B0%28%E4%B8%80%29-Lua%E6%98%AF%E6%80%8E%E4%B9%88%E8%B7%91%E8%B5%B7%E6%9D%A5%E7%9A%84/" target="_blank" rel="noopener"
+>https://yuerer.com/Lua5.3-%E8%AE%BE%E8%AE%A1%E5%AE%9E%E7%8E%B0(%E4%B8%80)-Lua%E6%98%AF%E6%80%8E%E4%B9%88%E8%B7%91%E8%B5%B7%E6%9D%A5%E7%9A%84/&lt;/a>
+&lt;a class="link" href="https://yuerer.com/Lua5.3-%E8%AE%BE%E8%AE%A1%E5%AE%9E%E7%8E%B0%28%E5%9B%9B%29-Closure%E4%B8%8EUpvalues/" target="_blank" rel="noopener"
+>https://yuerer.com/Lua5.3-%E8%AE%BE%E8%AE%A1%E5%AE%9E%E7%8E%B0(%E5%9B%9B)-Closure%E4%B8%8EUpvalues/&lt;/a>
+&lt;a class="link" href="https://zhuanlan.zhihu.com/p/358423900" target="_blank" rel="noopener"
+>https://zhuanlan.zhihu.com/p/358423900&lt;/a>&lt;/p>
+&lt;ol>
+&lt;li>《Lua设计与实现》&lt;/li>
+&lt;li>&lt;a class="link" href="https://blog.codingnow.com/2011/03/lua_gc_1.html" target="_blank" rel="noopener"
+>https://blog.codingnow.com/2011/03/lua_gc_1.html&lt;/a> 《云风-Lua GC 的源码剖析》&lt;/li>
+&lt;/ol></description></item><item><title>处理出现的CLOSE_WAIT状态</title><link>https://frozenlychees.github.io/p/%E5%A4%84%E7%90%86%E5%87%BA%E7%8E%B0%E7%9A%84close_wait%E7%8A%B6%E6%80%81/</link><pubDate>Mon, 25 Sep 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/%E5%A4%84%E7%90%86%E5%87%BA%E7%8E%B0%E7%9A%84close_wait%E7%8A%B6%E6%80%81/</guid><description>&lt;img src="https://frozenlychees.github.io/p/%E5%A4%84%E7%90%86%E5%87%BA%E7%8E%B0%E7%9A%84close_wait%E7%8A%B6%E6%80%81/tcp.png" alt="Featured image of post 处理出现的CLOSE_WAIT状态" />&lt;h1 id="处理出现的close_wait状态">处理出现的CLOSE_WAIT状态&lt;/h1>
+&lt;h2 id="问题">问题&lt;/h2>
+&lt;p>先说一下问题的基本情况。在内网压测过程中发现压测机器人无法登录，但在外网跑了一天稳定性也没出现问题。&lt;/p>
+&lt;p>感觉很奇怪，终于有一天，内容日志中发现了下面一段&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">accept error: Too Many open files
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>看起来是文件描述符打开过多，一开始以为压测的人数太多了，超过了描述符数量，就调整人数以及通过ulimit 方式增加进程的文件描述符数量。结果治标不治本，在执行过多次机器人后，发现问题还是存在&lt;/p>
+&lt;p>随机通过下面一些命令查看打开的描述符&lt;/p>
+&lt;ul>
+&lt;li>lsof -p &amp;lt;进程号&amp;gt; 查看对应进程的文件描述符&lt;/li>
+&lt;li>ss -tnae 查看socket的状态&lt;/li>
+&lt;/ul>
+&lt;p>发现有一堆socket处于CLOSE_WAIT状态.&lt;/p>
+&lt;p>随即找到TCP的状态机看看为啥出现这样的情况&lt;/p>
+&lt;p>&lt;img src="https://frozenlychees.github.io/p/%E5%A4%84%E7%90%86%E5%87%BA%E7%8E%B0%E7%9A%84close_wait%E7%8A%B6%E6%80%81/tcp.png"
+width="504"
+height="577"
+srcset="https://frozenlychees.github.io/p/%E5%A4%84%E7%90%86%E5%87%BA%E7%8E%B0%E7%9A%84close_wait%E7%8A%B6%E6%80%81/tcp_huc56db9f9e90fb353d7fc6985839791c6_137501_480x0_resize_box_3.png 480w, https://frozenlychees.github.io/p/%E5%A4%84%E7%90%86%E5%87%BA%E7%8E%B0%E7%9A%84close_wait%E7%8A%B6%E6%80%81/tcp_huc56db9f9e90fb353d7fc6985839791c6_137501_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+alt="TCP状态机"
+class="gallery-image"
+data-flex-grow="87"
+data-flex-basis="209px"
+>&lt;/p>
+&lt;p>&lt;img src="https://frozenlychees.github.io/p/%E5%A4%84%E7%90%86%E5%87%BA%E7%8E%B0%E7%9A%84close_wait%E7%8A%B6%E6%80%81/close.png"
+width="1381"
+height="1392"
+srcset="https://frozenlychees.github.io/p/%E5%A4%84%E7%90%86%E5%87%BA%E7%8E%B0%E7%9A%84close_wait%E7%8A%B6%E6%80%81/close_hufb6ddfaa762a0bc23bca20cd0729a556_255680_480x0_resize_box_3.png 480w, https://frozenlychees.github.io/p/%E5%A4%84%E7%90%86%E5%87%BA%E7%8E%B0%E7%9A%84close_wait%E7%8A%B6%E6%80%81/close_hufb6ddfaa762a0bc23bca20cd0729a556_255680_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+alt="Alt text"
+class="gallery-image"
+data-flex-grow="99"
+data-flex-basis="238px"
+>&lt;/p>
+&lt;p>根据上面的图可以知道，进入CLOSE_WAIT状态了之后，是需要进程主动调用close来关闭fd才能改变状态机的状态的。&lt;/p>
+&lt;p>翻阅代码，果然发现同事在处理连接断开的时候存在问题，没调用对应的close来关闭fd。&lt;/p>
+&lt;p>测试一下发现，只要是个链接，fd就会卡在CLOSE_WAIT状态，直到超过进程fd上限。调用close之后确实问题解决了。&lt;/p>
+&lt;h2 id="外网为啥没问题">外网为啥没问题？&lt;/h2>
+&lt;p>在解决之后，突然想到为啥外网没事呢？ 理论上是一套代码，应该一定会卡在CLOSE_WAIT状态才对.&lt;/p>
+&lt;p>测试了一下，发现外网也存在这个情况，但CLOSE_WAIT状态的链接大概3分钟后就被清理掉了。
+而且外网的进程可持有FD数量也比较大，所以才没出现无法登录的情况。&lt;/p>
+&lt;p>看来CLOSE_WAIT应该是有系统级别的清理方法作为最后的保障。&lt;/p>
+&lt;p>但查了一圈好像没人说过这个情况，看到一个稍微靠谱一点的说法是 TCP的 keep_alive机制&lt;/p>
+&lt;p>TCP keep_alive 是内核层面上的TCP保活机制，它会隔一段时间就侦测一下TCP链接是否还有效。通过一下命令可以看到对应的参数&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ cat /proc/sys/net/ipv4/tcp_keepalive_time 7200
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ cat /proc/sys/net/ipv4/tcp_keepalive_intvl 75
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ cat /proc/sys/net/ipv4/tcp_keepalive_probes 9
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>默认配置如上&lt;/p>
+&lt;ul>
+&lt;li>tcp_keepalive_time 7200 秒后发送一次侦测包&lt;/li>
+&lt;li>tcp_keepalive_intvl 如果没回应则 75 秒后再发一次&lt;/li>
+&lt;li>tcp_keepalive_probes 尝试9次没回应就断开连接&lt;/li>
+&lt;/ul>
+&lt;p>通过 ss -tnae 也能看到对应的连接上有一个timer ，表明下一次侦探包的时间&lt;/p>
+&lt;p>但稍微奇怪的是，我发现虽然外网的tcp_keepalive_time不是7200，但也是高达1200 .而CLOSE_WAIT状态大概200秒左右就被清理掉了，所以不能完全确定是TCP KEEP_ALIVE所造成的。&lt;/p>
+&lt;h2 id="2023---09---26-更新">2023 - 09 - 26 更新&lt;/h2>
+&lt;p>后续又调查了一下，虽然还是不能找到准确原因，但发现CLOSE_WAIT状态的清理可能和RST包有关，在客户端断开连接120秒后，因为服务器一直没下发FIN包，客户端发起RST强制中断了连接。&lt;/p>
+&lt;p>这个RST在服务器引擎中不知道怎么触发了Broken pipe操作，导致连接被清理掉了。&lt;/p>
+&lt;p>而内网开发的时候，因为服务器是搭建在windows10 的WSL2的虚拟机中，可能环境和真实的debian有出入，导致内网没触发 Broken pipe 所以没清理掉。&lt;/p>
+&lt;p>又尝试了一下 tcp_keepalive的行为，在debian上确实需要20分钟后才被清理。&lt;/p>
+&lt;h2 id="引用">引用&lt;/h2>
+&lt;ol>
+&lt;li>&lt;a class="link" href="https://www.jianshu.com/p/94dff0f29218" target="_blank" rel="noopener"
+>https://www.jianshu.com/p/94dff0f29218&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://www.jianshu.com/p/3c7a0771b67e" target="_blank" rel="noopener"
+>https://www.jianshu.com/p/3c7a0771b67e&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://www.xiaolincoding.com/network/3_tcp/tcp_interview.html#%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%87%BA%E7%8E%B0%E5%A4%A7%E9%87%8F-close-wait-%E7%8A%B6%E6%80%81%E7%9A%84%E5%8E%9F%E5%9B%A0%E6%9C%89%E5%93%AA%E4%BA%9B" target="_blank" rel="noopener"
+>https://www.xiaolincoding.com/network/3_tcp/tcp_interview.html#%E6%9C%8D%E5%8A%A1%E5%99%A8%E5%87%BA%E7%8E%B0%E5%A4%A7%E9%87%8F-close-wait-%E7%8A%B6%E6%80%81%E7%9A%84%E5%8E%9F%E5%9B%A0%E6%9C%89%E5%93%AA%E4%BA%9B&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://zhuanlan.zhihu.com/p/578699402" target="_blank" rel="noopener"
+>https://zhuanlan.zhihu.com/p/578699402&lt;/a>&lt;/li>
+&lt;/ol></description></item><item><title>Lua 源码阅读笔记-Table</title><link>https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/</link><pubDate>Sat, 23 Sep 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/</guid><description>&lt;img src="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/lua.png" alt="Featured image of post Lua 源码阅读笔记-Table" />&lt;h1 id="lua-源码阅读笔记-table">Lua 源码阅读笔记-Table&lt;/h1>
+&lt;p>lua版本基于5.4.6， 文章更多是记录自己在阅读的是思绪，而非科普。&lt;/p>
+&lt;p>很多源码比较长，直接贴不太好，建议阅读时配合着源码一起。&lt;/p>
+&lt;p>如果内容有问题或者不正确的地方，欢迎留言讨论。&lt;/p>
+&lt;h2 id="lua的table">Lua的Table&lt;/h2>
+&lt;p>Lua的table 比较灵活，可以同时作为数组和字典，在内部实现上实际是有区分这两个类型的。&lt;/p>
+&lt;p>首先看一下Table的基本结构&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">typedef struct Table {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> CommonHeader;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lu_byte flags; /* 1&amp;lt;&amp;lt;p means tagmethod(p) is not present */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lu_byte lsizenode; /* log2 of size of &amp;#39;node&amp;#39; array */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> unsigned int alimit; /* &amp;#34;limit&amp;#34; of &amp;#39;array&amp;#39; array */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> TValue *array; /* array part */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> Node *node;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> Node *lastfree; /* any free position is before this position */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct Table *metatable;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> GCObject *gclist;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">} Table;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>flags
+lsizenode: log2(字典大小) 的结果， 这边也还说明作为字典的时候，大小一定是2的倍数
+alimit: 看起来是数组的大小，但不一定时准确的数组大小
+array： 当table是数组时，指向使用的内存位置
+node: 当table是字典时，指向使用的内存位置
+lastfree: 当table刚申请的时候，指向table的末尾，冲突时会向前移动这个指针，找到一个空闲的位置&lt;/p>
+&lt;p>metatable: 指向这个表的原表
+gclist: gc相关链表&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">typedef struct TValue {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> TValuefields;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">} TValue;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">typedef union Node {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct NodeKey {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> TValuefields; /* fields for value */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lu_byte key_tt; /* key type */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int next; /* for chaining */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> Value key_val; /* key value */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> } u;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> TValue i_val; /* direct access to node&amp;#39;s value as a proper &amp;#39;TValue&amp;#39; */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">} Node;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>node 对象的组成实际上就是NodeKey， 虽然整个Node是union标识的，但实际上NodeKey这个结构体的第一个字段和TValue 是一样的，所以i_val只是一个快速访问node中value的字段的方式。&lt;/p>
+&lt;p>回到NodeKey上面，NodeKey由以下字段组成&lt;/p>
+&lt;ul>
+&lt;li>TValuefields 存储value的类型和值(或者指针)&lt;/li>
+&lt;li>key_tt key的类型&lt;/li>
+&lt;li>key_val key 的值&lt;/li>
+&lt;li>next hash冲突时使用链表来解决。&lt;/li>
+&lt;/ul>
+&lt;p>&lt;img src="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/luaTableStruct.png"
+width="599"
+height="442"
+srcset="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/luaTableStruct_hub0d78077bdecf60d248d0e8f74606f7b_77866_480x0_resize_box_3.png 480w, https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/luaTableStruct_hub0d78077bdecf60d248d0e8f74606f7b_77866_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+alt="Alt text"
+class="gallery-image"
+data-flex-grow="135"
+data-flex-basis="325px"
+>&lt;/p>
+&lt;p>这边附上《lua设计与实现》 一书中的对于表结构的图，注意书中是LUA5.1的结构，我阅读的时LUA5.4稍微有点区别，但基本类似, 图方便没有自己画图。&lt;/p>
+&lt;h1 id="table-的搜索">table 的搜索&lt;/h1>
+&lt;p>先看以下对于一个table，lua是怎么尝试找到对应的值的。&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="o">/*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">**&lt;/span> &lt;span class="n">main&lt;/span> &lt;span class="n">search&lt;/span> &lt;span class="n">function&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">const&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">luaH_get&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">Table&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">switch&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">ttypetag&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">))&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">case&lt;/span> &lt;span class="n">LUA_VSHRSTR&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="k">return&lt;/span> &lt;span class="n">luaH_getshortstr&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">tsvalue&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">));&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">case&lt;/span> &lt;span class="n">LUA_VNUMINT&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="k">return&lt;/span> &lt;span class="n">luaH_getint&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">ivalue&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">));&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">case&lt;/span> &lt;span class="n">LUA_VNIL&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="k">return&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">absentkey&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">case&lt;/span> &lt;span class="n">LUA_VNUMFLT&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">lua_Integer&lt;/span> &lt;span class="n">k&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">luaV_flttointeger&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">fltvalue&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">),&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">k&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">F2Ieq&lt;/span>&lt;span class="p">))&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">integral&lt;/span> &lt;span class="n">index&lt;/span>&lt;span class="err">?&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">luaH_getint&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">k&lt;/span>&lt;span class="p">);&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">use&lt;/span> &lt;span class="n">specialized&lt;/span> &lt;span class="n">version&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">/*&lt;/span> &lt;span class="k">else&lt;/span>&lt;span class="o">...&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">FALLTHROUGH&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">default&lt;/span>&lt;span class="p">:&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">getgeneric&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">key&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>对于一个table和一个指定的key，会根据key的类型来决定调用什么方式搜索；&lt;/p>
+&lt;ul>
+&lt;li>当key 是short str的时候，会调用luaH_getshortstr&lt;/li>
+&lt;li>当key 是int 或者是 等于整数的float的时候，会调用luaH_getint&lt;/li>
+&lt;li>当key 是nil的时候，直接返回absentkey（不存在的key&lt;/li>
+&lt;li>其他情况调用getgeneric&lt;/li>
+&lt;/ul>
+&lt;h2 id="luah_getshortstr">luaH_getshortstr&lt;/h2>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="k">const&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">luaH_getshortstr&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">Table&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">TString&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">Node&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">n&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">hashstr&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">key&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">lua_assert&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">tt&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="n">LUA_VSHRSTR&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">for&lt;/span> &lt;span class="p">(;;)&lt;/span> &lt;span class="p">{&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">check&lt;/span> &lt;span class="n">whether&lt;/span> &lt;span class="s1">&amp;#39;key&amp;#39;&lt;/span> &lt;span class="n">is&lt;/span> &lt;span class="n">somewhere&lt;/span> &lt;span class="ow">in&lt;/span> &lt;span class="n">the&lt;/span> &lt;span class="n">chain&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">keyisshrstr&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">n&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="o">&amp;amp;&amp;amp;&lt;/span> &lt;span class="n">eqshrstr&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">keystrval&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">n&lt;/span>&lt;span class="p">),&lt;/span> &lt;span class="n">key&lt;/span>&lt;span class="p">))&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">gval&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">n&lt;/span>&lt;span class="p">);&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">that&lt;/span>&lt;span class="s1">&amp;#39;s it */&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">else&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">nx&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">gnext&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">n&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">nx&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">absentkey&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="ow">not&lt;/span> &lt;span class="n">found&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">n&lt;/span> &lt;span class="o">+=&lt;/span> &lt;span class="n">nx&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>获取字符串的hash值，然后判断对应的node是不是short str类型 且是否和key相等，相等则返回对应的value；不是的话则通过next字段找到下一个node。这边看方式next存的不是下一个node的指针，而是偏移。&lt;/p>
+&lt;h2 id="luah_getint">luaH_getint&lt;/h2>
+&lt;p>这个函数的步骤大概如下：&lt;/p>
+&lt;ol>
+&lt;li>确认key的范围是不是在数组大小内，即 0&amp;lt; key &amp;lt; alimit, 如果是则直接返回array[key - 1]&lt;/li>
+&lt;li>如果alimit不是真实的数组长度，且key是在真实范围内的话，则也直接返回array&lt;a class="link" href="%e8%bf%99%e8%be%b9%e4%b8%8d%e6%98%af%e7%9c%9f%e5%ae%9e%e7%9a%84%e6%95%b0%e7%bb%84%e9%95%bf%e5%ba%a6%e5%8e%9f%e5%9b%a0%e5%a5%bd%e5%83%8f%e6%98%af%e5%9b%a0%e4%b8%ba%e6%95%b0%e7%bb%84%e4%b8%ad%e5%8c%85%e5%90%ab%e4%ba%86nil" >key - 1&lt;/a>&lt;/li>
+&lt;li>尝试用字典的方式在搜索一波key。&lt;/li>
+&lt;li>都失败了则返回absentkey。&lt;/li>
+&lt;/ol>
+&lt;h2 id="getgeneric">getgeneric&lt;/h2>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="k">static&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">getgeneric&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">Table&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="ne">int&lt;/span> &lt;span class="n">deadok&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">Node&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">n&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">mainpositionTV&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">key&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">for&lt;/span> &lt;span class="p">(;;)&lt;/span> &lt;span class="p">{&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">check&lt;/span> &lt;span class="n">whether&lt;/span> &lt;span class="s1">&amp;#39;key&amp;#39;&lt;/span> &lt;span class="n">is&lt;/span> &lt;span class="n">somewhere&lt;/span> &lt;span class="ow">in&lt;/span> &lt;span class="n">the&lt;/span> &lt;span class="n">chain&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">equalkey&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">n&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">deadok&lt;/span>&lt;span class="p">))&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">gval&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">n&lt;/span>&lt;span class="p">);&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">that&lt;/span>&lt;span class="s1">&amp;#39;s it */&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">else&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">nx&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">gnext&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">n&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">nx&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">absentkey&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="ow">not&lt;/span> &lt;span class="n">found&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">n&lt;/span> &lt;span class="o">+=&lt;/span> &lt;span class="n">nx&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>getgeneric 函数就是完全将table当作hash表来进行搜索了。搜索代码上和short hash 基本一样的，先通过mainpositionTV获取key的第一个位置，然后通过这个位置不断的在table中寻找匹配的key。&lt;/p>
+&lt;p>mainpositionTV 中会通过key的类型来获取对应的hash值。&lt;/p>
+&lt;h1 id="table的插入">table的插入&lt;/h1>
+&lt;p>table 插入的入口看起来是luaH_set&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">void&lt;/span> &lt;span class="n">luaH_set&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">lua_State&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">Table&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">value&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">const&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">slot&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">luaH_get&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">key&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">luaH_finishset&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">key&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">slot&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">value&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>整个函数就2行，找到一个key，然后设置成对应的value&lt;/p>
+&lt;h2 id="luah_finishset">luaH_finishset&lt;/h2>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">void&lt;/span> &lt;span class="n">luaH_finishset&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">lua_State&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">Table&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">key&lt;/span>&lt;span class="p">,&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">const&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">slot&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">value&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">isabstkey&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">slot&lt;/span>&lt;span class="p">))&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">luaH_newkey&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">t&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">key&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">value&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">else&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">setobj2t&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">cast&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">TValue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">slot&lt;/span>&lt;span class="p">),&lt;/span> &lt;span class="n">value&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>在luaH_finishset中，如果slot查找出来是absentkey，则会调用luaH_newkey创建新的key，不然就直接设置value即可。&lt;/p>
+&lt;p>luaH_newkey 函数比较长，建议对照源码来看.&lt;/p>
+&lt;ol>
+&lt;li>首先先要确认key和value 的类型，当key或者value为nil的时候，是不允许插入的。如果key是float且能转成int 的话，则key会被当做int进行插入。&lt;/li>
+&lt;li>通过mainpositionTV来找到对应的node&lt;/li>
+&lt;li>如果发现需要扩容，则执行rehash，然后递归重新执行luaH_set。&lt;/li>
+&lt;li>如果找到的node已经有数据的话，则通过这步找到一个新的位置；&lt;/li>
+&lt;li>将找到的node的key和value都设置好。&lt;/li>
+&lt;/ol>
+&lt;p>这边的第3、4步代码如下：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;span class="lnt">45
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl"> mp = mainpositionTV(t, key);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 判断是否冲突或者hash表的lastfree为空
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (!isempty(gval(mp)) || isdummy(t)) { /* main position is taken? */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 先找一个空位来放这个元素
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // getfreepos 默认都是从内存块的最后往前找一个没元素的位置
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> Node *othern;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> Node *f = getfreepos(t); /* get a free place */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (f == NULL) { /* cannot find a free place? */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 没位置了就rehash
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> rehash(L, t, key); /* grow table */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> /* whatever called &amp;#39;newkey&amp;#39; takes care of TM cache */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> luaH_set(L, t, key, value); /* insert key into grown table */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lua_assert(!isdummy(t));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 将碰撞位置的元素进行一次hash来判断这个元素是否应该在这里
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> othern = mainpositionfromnode(t, mp);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (othern != mp) { /* is colliding node out of its main position? */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> /* yes; move colliding node into free position */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 将碰撞的元素找到一个新的位置插入
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> while (othern + gnext(othern) != mp) /* find previous */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> othern += gnext(othern);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> gnext(othern) = cast_int(f - othern); /* rechain to point to &amp;#39;f&amp;#39; */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> *f = *mp; /* copy colliding node into free pos. (mp-&amp;gt;next also goes) */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 将新元素插入到原来碰撞元素的位置
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (gnext(mp) != 0) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> gnext(f) += cast_int(mp - f); /* correct &amp;#39;next&amp;#39; */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> gnext(mp) = 0; /* now &amp;#39;mp&amp;#39; is free */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> setempty(gval(mp));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> else {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 碰撞的位置是对应位置上的元素，则将新位置链接到这个元素后面
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> /* colliding node is in its own main position */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> /* new node will go into free position */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (gnext(mp) != 0)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> gnext(f) = cast_int((mp + gnext(mp)) - f); /* chain new position */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> else lua_assert(gnext(f) == 0);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> gnext(mp) = cast_int(f - mp);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> mp = f;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>lua的table和其他dict实现的有点不太一样，以Python为例子，Python的hash表实现是hash表和元素节点的内存是分开的，hash表中存的是元素的链表。但Lua中hash表和元素是共用内存的，即hash表存的就是元素。&lt;/p>
+&lt;p>而且冲突的时候的处理也挺不一致的。python因为元素内存是额外申请的，所以找到位置后直接修改链表即可。而Lua在冲突的时候，是通过lastfree指针在hash表从后往前找一个空闲的元素位置，然后根据冲突节点来判断这个空闲的位置到底是给新节点还是冲突节点。&lt;/p>
+&lt;p>感觉这种实现的话，应该是为内存效率做考虑，但代价就是冲突处理的效率肯定是低于其他实现的，同时table删除元素是将对应的value修改成nil来实现的，所以lastfree指针只会不断向前，对于会频繁增删的hash表来说，应该是会造成rehash的次数上涨的。&lt;/p>
+&lt;h2 id="rehash">rehash&lt;/h2>
+&lt;p>lua table的rehash因为同时包含数组和hash表的，所以在rehash的时候，会同时改变这两个部分的内容。luaH_resize才是真正重新分配内存的地方，而之前的部分都是为了计算出一个新的数组大小和hash表大小。
+主要涉及到一下几个变量：&lt;/p>
+&lt;ul>
+&lt;li>totaluse 表示所有key的总和&lt;/li>
+&lt;li>na表示数字部分的key的总和&lt;/li>
+&lt;li>nums 一个统计数组，nums[i] 表示 在 （2^(i - 1)， 2^i] 之间的数字key的个数&lt;/li>
+&lt;/ul>
+&lt;p>这几个变量会在computesizes 中计算出一个合适的新的数组部分大小asize，用来存储数字部分的key。computesizes函数的主要思路应该是算出一个最小的2的N次幂，使得其中数字key在[1, 2^N]的分布能够小于50%。
+而剩余的key就会认为应该是在hash表的部分，所以totaluse - asize 就是新的hash表大小。&lt;/p>
+&lt;p>luaH_resize 就会对这两个新的大小进行内存的重新分配和元素迁移。数组分部申请新的内存，然后直接内存拷贝相同大小部分的数据。hash表部分遍历全表，找到非nil元素进行搬迁，重新调用luaH_set对新table进行插入，这样需要搬迁到数组部分的元素也就会迁移过去了。&lt;/p>
+&lt;h2 id="取长度操作">取长度操作&lt;/h2>
+&lt;p>通过#操作来对table获取长度的操作实际上不是常规意义上的取长度.
+&amp;lsquo;#&amp;lsquo;操作符通过 luaH_getn 来完成，luaH_getn实际上是返回n，满足a[1]~a[n]所有元素不为空
+以下面的代码为例子：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">a = {4, 5, nil, nil，6}
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">print(#a)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt;&amp;gt; 5 -- 刚创建，所以初始化了数组长度，返回的还是5
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">a[6] = 1
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">print(#a)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&amp;gt;&amp;gt; 2 --多塞入一个，造成了rehash，数组长度需要通过luaH_getn来获得
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这边就可以看出，只要通过luaH_getn来获取长度，如果数组包含nil，那么获取的结果就不一定是完整的数组的长度。&lt;/p>
+&lt;p>luaH_getn 实现实际上是通过二分的方式来找满足 a[n - 1] ~= nil and a[n] == nil&lt;/p>
+&lt;p>这边就不分析具体代码了。&lt;/p>
+&lt;h1 id="总结">总结&lt;/h1>
+&lt;p>通过阅读table的增删查改，感觉到LUA对于table的实现上更注重内存的使用，所带来的代价就是rehash 和冲突解决的消耗变高了。&lt;/p>
+&lt;p>貌似table默认也不支持取正确的长度，可能在需要table长度的时候需要注意自己维护一下，避免每次都遍历table来获取长度&lt;/p>
+&lt;h1 id="引用">引用&lt;/h1>
+&lt;p>1.《lua设计与实现》&lt;/p></description></item><item><title>Lua 源码阅读笔记-String</title><link>https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/</link><pubDate>Fri, 01 Sep 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/</guid><description>&lt;img src="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/lua.png" alt="Featured image of post Lua 源码阅读笔记-String" />&lt;h1 id="lua-源码阅读笔记-string">Lua 源码阅读笔记-String&lt;/h1>
+&lt;p>lua版本基于5.4.6， 文章更多是记录自己在阅读的是思绪，而非科普。&lt;/p>
+&lt;p>很多源码比较长，直接贴不太好，建议阅读时配合着源码一起。&lt;/p>
+&lt;p>如果内容有问题或者不正确的地方，欢迎留言讨论。&lt;/p>
+&lt;h2 id="lua的string">Lua的String&lt;/h2>
+&lt;p>lua String 的代码很少， 相关的代码加起来也才几百行吧。&lt;/p>
+&lt;p>首先是字符串类型的定义&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">/*
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">** Header for a string value.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">*/
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">typedef struct TString {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> CommonHeader;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lu_byte extra; /* reserved words for short strings; &amp;#34;has hash&amp;#34; for longs */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lu_byte shrlen; /* length for short strings */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> unsigned int hash;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> union {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> size_t lnglen; /* length for long strings */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct TString *hnext; /* linked list for hash table */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> } u;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> char contents[1];
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">} TString;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;ul>
+&lt;li>extra 在短字符串中目前是用来判断是否是关键字，在长字符串中作为是否有hash值的标记&lt;/li>
+&lt;li>shrlen 短字符串的长度&lt;/li>
+&lt;li>hash hash值&lt;/li>
+&lt;li>u 长字符串是用做长度，短字符串是用作哈希表的链接&lt;/li>
+&lt;li>contents 存字符串的地方，用了个柔性数组，在申请的内存时候，字符串对应的位置可以一并申请并放在末尾。&lt;/li>
+&lt;/ul>
+&lt;p>extra 在短字符串中标记的位置是在luaX_init函数(llex.c)中&lt;/p>
+&lt;h2 id="luas_new">luaS_new&lt;/h2>
+&lt;p>这个函数在看起来是字符串创建的入口， 代码不长&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">TString&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">luaS_new&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">lua_State&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="nb">str&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">unsigned&lt;/span> &lt;span class="ne">int&lt;/span> &lt;span class="n">i&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">point2uint&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="nb">str&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="o">%&lt;/span> &lt;span class="n">STRCACHE_N&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="nb">hash&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">j&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">TString&lt;/span> &lt;span class="o">**&lt;/span>&lt;span class="n">p&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">G&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">)&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">strcache&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="p">];&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">for&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">j&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">j&lt;/span> &lt;span class="o">&amp;lt;&lt;/span> &lt;span class="n">STRCACHE_M&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">j&lt;/span>&lt;span class="o">++&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">strcmp&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="nb">str&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">getstr&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">p&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">j&lt;/span>&lt;span class="p">]))&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">hit&lt;/span>&lt;span class="err">?&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">p&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">j&lt;/span>&lt;span class="p">];&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">that&lt;/span> &lt;span class="n">is&lt;/span> &lt;span class="n">it&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">/*&lt;/span> &lt;span class="n">normal&lt;/span> &lt;span class="n">route&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">for&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">j&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">STRCACHE_M&lt;/span> &lt;span class="o">-&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">j&lt;/span> &lt;span class="o">&amp;gt;&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="n">j&lt;/span>&lt;span class="o">--&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">p&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">j&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">p&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">j&lt;/span> &lt;span class="o">-&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">];&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">move&lt;/span> &lt;span class="n">out&lt;/span> &lt;span class="n">last&lt;/span> &lt;span class="n">element&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">/*&lt;/span> &lt;span class="n">new&lt;/span> &lt;span class="n">element&lt;/span> &lt;span class="n">is&lt;/span> &lt;span class="n">first&lt;/span> &lt;span class="ow">in&lt;/span> &lt;span class="n">the&lt;/span> &lt;span class="n">list&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">p&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">luaS_newlstr&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="nb">str&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">strlen&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="nb">str&lt;/span>&lt;span class="p">));&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">p&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">];&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>可以看到在用这个接口生成字符串的时候，会先判断字符串地址是否在cache中，如果在的话，直接返回cache的对象，否则在缓存头部插入这个对象；STRCACHE_M是hash桶的大小，如果超过大小则会踢掉最后一个元素。&lt;/p>
+&lt;h2 id="luas_newlstr-创建字符串的函数">luaS_newlstr 创建字符串的函数&lt;/h2>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">TString&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">luaS_newlstr&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">lua_State&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="nb">str&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">size_t&lt;/span> &lt;span class="n">l&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">l&lt;/span> &lt;span class="o">&amp;lt;=&lt;/span> &lt;span class="n">LUAI_MAXSHORTLEN&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="o">/*&lt;/span> &lt;span class="n">short&lt;/span> &lt;span class="n">string&lt;/span>&lt;span class="err">?&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">internshrstr&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="nb">str&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">l&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">else&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">TString&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">ts&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">l_unlikely&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">l&lt;/span> &lt;span class="o">&amp;gt;=&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">MAX_SIZE&lt;/span> &lt;span class="o">-&lt;/span> &lt;span class="n">sizeof&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">TString&lt;/span>&lt;span class="p">))&lt;/span>&lt;span class="o">/&lt;/span>&lt;span class="n">sizeof&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">char&lt;/span>&lt;span class="p">)))&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">luaM_toobig&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ts&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">luaS_createlngstrobj&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">l&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">memcpy&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">getstr&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ts&lt;/span>&lt;span class="p">),&lt;/span> &lt;span class="nb">str&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">l&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">sizeof&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">char&lt;/span>&lt;span class="p">));&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">ts&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这边看LUA 默认的短字符串长度为40（宏为 LUAI_MAXSHORTLEN），短字符串会通过internshrstr来创建字符串对象；而超过短长度限制的会通过luaS_createlngstrobj来创建对应的字符串对象，并赋值到content中。&lt;/p>
+&lt;h2 id="internshrstr">internshrstr&lt;/h2>
+&lt;p>internshrstr 函数可以分成3个部分&lt;/p>
+&lt;ol>
+&lt;li>首先是根据全局共享的global_State获取到对应的stringtable，这个stringtable相当于字符串的哈希表。然后算出对应字符串的hash值。&lt;/li>
+&lt;li>在stringtable中查找是否有对应的字符串，有的话直接服用；这边又一个特殊一点的，就是如果找到的字符串已经没人被其他地方引用，但还没被GC回收的话，那么也会直接让对象复活。&lt;/li>
+&lt;li>到这边就确定是必须创建的字符串对象，那么就申请空间，赋值content，然后判断对应的stringtable是不是要扩容了，最后插入到stringtable中，并返回。&lt;/li>
+&lt;/ol>
+&lt;h2 id="luas_createlngstrobj">luaS_createlngstrobj&lt;/h2>
+&lt;p>超长的对象不会进入stringtable，直接申请空间赋值就结束了。他们申请空间走的都是createstrobj这个接口，但有几个不同的点&lt;/p>
+&lt;ul>
+&lt;li>短字符串的tag是LUA_VSHRSTR， 而长字符串的tag是LUA_VLNGSTR。&lt;/li>
+&lt;li>短字符串是用shrlen表示长度，而长字符串是用lnglen来表示长度&lt;/li>
+&lt;li>长字符串在申请的时候确实没填充hash、shrlen、extra，&lt;/li>
+&lt;/ul>
+&lt;p>这边感觉到LUA对短字符串的内存使用有使用一些优化的手段；而对于不太常用的长字符串的话，貌似会浪费一些字段，但也不是特别要紧。&lt;/p>
+&lt;h2 id="growstrtab--luas_resize">growstrtab &amp;amp; luaS_resize&lt;/h2>
+&lt;p>growstrtab 和 luaS_resize 实际上都是为了调用tablerehash的。&lt;/p>
+&lt;p>growstrtab函数在internshrstr中会用到，主要是在第三步扩容的位置使用。&lt;/p>
+&lt;p>luaS_resize的代码主要分为两种情况&lt;/p>
+&lt;ul>
+&lt;li>当是缩容的情况，luaS_resize先执行一遍tablerehash，然后在申请新内存（看完后面的tablerehash，感觉缩容不应该会改变内存），如果申请失败则恢复。&lt;/li>
+&lt;li>当是扩容的情况，只有申请成功了之后才会操作。&lt;/li>
+&lt;/ul>
+&lt;h2 id="tablerehash">tablerehash&lt;/h2>
+&lt;p>tablerehash的代码感觉有点意思的，是在本地上进行的rehash。有点不同于python、stl之类的方式，它们的方式是先申请一个表，然后for循环当前的hash表，将元素在新表上找到位置后一个个搬迁过去。而lua的实现如下&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">static void tablerehash (TString **vect, int osize, int nsize) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int i;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i = osize; i &amp;lt; nsize; i++) /* clear new elements */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> vect[i] = NULL;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i = 0; i &amp;lt; osize; i++) { /* rehash old part of the array */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> TString *p = vect[i];
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> vect[i] = NULL;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> while (p) { /* for each string in the list */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> TString *hnext = p-&amp;gt;u.hnext; /* save next */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> unsigned int h = lmod(p-&amp;gt;hash, nsize); /* new position */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> p-&amp;gt;u.hnext = vect[h]; /* chain it into array */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> vect[h] = p;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> p = hnext;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>lua的这个tablerehash 主要执行的步骤如下：&lt;/p>
+&lt;ol>
+&lt;li>如果是扩容，则将新生长的部分清空。&lt;/li>
+&lt;li>遍历原来的长度的数据，将原来长度中的元素按新大小进行hash找到位置放到链表头部。&lt;/li>
+&lt;/ol>
+&lt;p>乍一看这个代码会想到两个问题&lt;/p>
+&lt;ol>
+&lt;li>元素被重新映射到当前位置，构成死循环？&lt;/li>
+&lt;li>是否会出现重新映射后的元素后面再次遍历到？即新的元素位置还是小于osize？&lt;/li>
+&lt;/ol>
+&lt;p>但实际上上面的问题都不会存在。先来解释第一个情况，因为在遍历到vect[i]的时候，把vect[i]的元素设置成NULL了，相当于先把链表和hash表分离了。所以即使在同一个位置，也不会构成死循环。&lt;/p>
+&lt;p>第二个问题，则需要考虑到LUA的这个表的扩容和缩容一定是以2的倍数进行的。也就是扩大一定是扩大2倍，缩小也一定缩小到原来的1/2，这边在源码中可以搜索到调用luaS_resize的位置只有2处。&lt;/p>
+&lt;p>假设原来的大小是4，扩容后的大小是8。原来映射到0号位置的元素，被rehash后，出现的位置一定是0和4，同理原来1号位置的元素会被映射到1和5。而rehash的范围是0~3,所以不可能出现rehash后元素的位置会小于osize且不为i的。&lt;/p>
+&lt;p>这个实现方式的好处感觉在于就是可以不必频繁的变动内存位置，减少申请内存的次数。扩缩容的时候可以预留一部分内存，等真正不够用的时候在去申请更大的内存块。&lt;/p>
+&lt;h2 id="总结">总结&lt;/h2>
+&lt;p>字符串对象的实现确实都差不多，相比于Python 来说确实会更加轻量化一点。同时也看得出来LUA的字符串是不考虑编码格式的问题。tablerehash的方式和Redis的字典扩容的方式应该可以算是一致的。&lt;/p>
+&lt;p>&lt;img src="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/LuaStringTable.png"
+width="963"
+height="613"
+srcset="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/LuaStringTable_hu88c3fdb2745106bb23123ab450b0f6f5_105896_480x0_resize_box_3.png 480w, https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/LuaStringTable_hu88c3fdb2745106bb23123ab450b0f6f5_105896_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+alt="字符串组织结构"
+class="gallery-image"
+data-flex-grow="157"
+data-flex-basis="377px"
+>&lt;/p>
+&lt;p>同样的，图例的GCObject应该修改成CommonHeader。&lt;/p>
+&lt;h2 id="引用">引用&lt;/h2>
+&lt;ol>
+&lt;li>《Lua设计与实现》&lt;/li>
+&lt;/ol></description></item><item><title>Lua 源码阅读笔记-基本类型</title><link>https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/</link><pubDate>Fri, 01 Sep 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/</guid><description>&lt;img src="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/lua.png" alt="Featured image of post Lua 源码阅读笔记-基本类型" />&lt;h1 id="lua-源码阅读笔记-基本类型">Lua 源码阅读笔记-基本类型&lt;/h1>
+&lt;p>lua版本基于5.4.6， 文章更多是记录自己在阅读的是思绪，而非科普。
+如果内容有问题或者不正确的地方，欢迎留言讨论。&lt;/p>
+&lt;h2 id="lua的基本类型">Lua的基本类型&lt;/h2>
+&lt;p>在Lua中，所有的类型都是通过Value + type的方式进行管理&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">// lobject.h
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">typedef union Value {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct GCObject *gc; /* collectable objects */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> void *p; /* light userdata */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lua_CFunction f; /* light C functions */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lua_Integer i; /* integer numbers */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lua_Number n; /* float numbers */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> /* not used, but may avoid warnings for uninitialized value */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lu_byte ub;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">} Value;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define TValuefields Value value_; lu_byte tt_
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">typedef struct TValue {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> TValuefields;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">} TValue;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>Tvalue中value_管理对应的值或者指针，而 tt_管理对应的类型, lu_byte实际上是unsigned char。&lt;/p>
+&lt;p>这边的类型不是用enum之类的来实现的，而是用一系列的宏来标识对应的类型。&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="o">//&lt;/span> &lt;span class="n">lobject&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">h&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">/*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">**&lt;/span> &lt;span class="n">tags&lt;/span> &lt;span class="k">for&lt;/span> &lt;span class="n">Tagged&lt;/span> &lt;span class="n">Values&lt;/span> &lt;span class="n">have&lt;/span> &lt;span class="n">the&lt;/span> &lt;span class="n">following&lt;/span> &lt;span class="n">use&lt;/span> &lt;span class="n">of&lt;/span> &lt;span class="n">bits&lt;/span>&lt;span class="p">:&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">**&lt;/span> &lt;span class="n">bits&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="o">-&lt;/span>&lt;span class="mi">3&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="n">actual&lt;/span> &lt;span class="n">tag&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">a&lt;/span> &lt;span class="n">LUA_T&lt;/span>&lt;span class="o">*&lt;/span> &lt;span class="n">constant&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">**&lt;/span> &lt;span class="n">bits&lt;/span> &lt;span class="mi">4&lt;/span>&lt;span class="o">-&lt;/span>&lt;span class="mi">5&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="n">variant&lt;/span> &lt;span class="n">bits&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">**&lt;/span> &lt;span class="n">bit&lt;/span> &lt;span class="mi">6&lt;/span>&lt;span class="p">:&lt;/span> &lt;span class="n">whether&lt;/span> &lt;span class="n">value&lt;/span> &lt;span class="n">is&lt;/span> &lt;span class="n">collectable&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">/*&lt;/span> &lt;span class="n">add&lt;/span> &lt;span class="n">variant&lt;/span> &lt;span class="n">bits&lt;/span> &lt;span class="n">to&lt;/span> &lt;span class="n">a&lt;/span> &lt;span class="n">type&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">#define makevariant(t,v) ((t) | ((v) &amp;lt;&amp;lt; 4))&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>从注释上来看， bits的0-3位是真正用来做tag的位， 这边的tag基本类型定义如下：&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">//lua.h
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_TNIL 0
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_TBOOLEAN 1
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_TLIGHTUSERDATA 2
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_TNUMBER 3
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_TSTRING 4
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_TTABLE 5
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_TFUNCTION 6
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_TUSERDATA 7
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_TTHREAD 8
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define LUA_NUMTYPES 9
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>后面的扩展位就是用来在同一种类型下区分子类型的，例如&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;span class="lnt">8
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="o">/*&lt;/span> &lt;span class="n">Standard&lt;/span> &lt;span class="n">nil&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">#define LUA_VNIL makevariant(LUA_TNIL, 0)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">/*&lt;/span> &lt;span class="n">Empty&lt;/span> &lt;span class="n">slot&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">which&lt;/span> &lt;span class="n">might&lt;/span> &lt;span class="n">be&lt;/span> &lt;span class="n">different&lt;/span> &lt;span class="n">from&lt;/span> &lt;span class="n">a&lt;/span> &lt;span class="n">slot&lt;/span> &lt;span class="n">containing&lt;/span> &lt;span class="n">nil&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="o">*/&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">#define LUA_VEMPTY makevariant(LUA_TNIL, 1)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">#define LUA_VFALSE makevariant(LUA_TBOOLEAN, 0)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">#define LUA_VTRUE makevariant(LUA_TBOOLEAN, 1)&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="被gc管理的对象">被GC管理的对象&lt;/h2>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">** Common Header for all collectable objects (in macro form, to be
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">** included in other objects)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">*/
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define CommonHeader struct GCObject *next; lu_byte tt; lu_byte marked
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">/* Common type for all collectable objects */
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">typedef struct GCObject {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> CommonHeader;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">} GCObject;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">// 宏展开后的结果如下
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">/*
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">typedef struct GCObject {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct GCObject *next;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lu_byte tt;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> lu_byte marked;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">} GCObject;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">*/
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>GCoBjcet的实现里面就只有一个CommonHeader，所有需要被GC管理的对象都会带上这个Header。相当于就是继承到了GcObject。 这个GcObject的实现实际上就是个单链表. 同时这边又补充了几个宏，用于gc对象的操作。&lt;/p>
+&lt;p>其中marked 被用来在GC回收过程中的标记作用。&lt;/p>
+&lt;p>这边再回看一开始的Union Value, GCObject 也被囊括再其中，借用《Lua设计与实现》一书中的图，可以比较清晰的。&lt;/p>
+&lt;p>&lt;img src="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/lua_object.png"
+width="1230"
+height="565"
+srcset="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/lua_object_hud96faff07f14da81b4302a6957b27975_196047_480x0_resize_box_3.png 480w, https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/lua_object_hud96faff07f14da81b4302a6957b27975_196047_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+alt="lua对象结构"
+class="gallery-image"
+data-flex-grow="217"
+data-flex-basis="522px"
+>&lt;/p>
+&lt;p>这边有一个需要修正的，图中的GCHeader在Lua5.4.6中已经不存在了，即GCObject中，第一个字段直接就是CommonHeader.&lt;/p>
+&lt;h2 id="引用">引用&lt;/h2>
+&lt;ol>
+&lt;li>《Lua设计与实现》&lt;/li>
+&lt;li>&lt;a class="link" href="https://blog.codingnow.com/2011/03/lua_gc_1.html" target="_blank" rel="noopener"
+>https://blog.codingnow.com/2011/03/lua_gc_1.html&lt;/a> 《云风-Lua GC 的源码剖析》&lt;/li>
+&lt;/ol></description></item><item><title>testTitle</title><link>https://frozenlychees.github.io/p/testslug/</link><pubDate>Wed, 16 Aug 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/testslug/</guid><description>&lt;img src="https://frozenlychees.github.io/p/testslug/cover.jpg" alt="Featured image of post testTitle" />&lt;p>Welcome to Hugo theme Stack. This is your first post. Edit or delete it, then start writing!&lt;/p>
+&lt;p>&lt;img src="https://frozenlychees.github.io/p/testslug/1.png"
+width="668"
+height="124"
+srcset="https://frozenlychees.github.io/p/testslug/1_huc88bdc85f17db34c577971e667db4c39_12241_480x0_resize_box_3.png 480w, https://frozenlychees.github.io/p/testslug/1_huc88bdc85f17db34c577971e667db4c39_12241_1024x0_resize_box_3.png 1024w"
+loading="lazy"
+alt="测试图片"
+class="gallery-image"
+data-flex-grow="538"
+data-flex-basis="1292px"
+>&lt;/p>
+&lt;p>For more information about this theme, check the documentation: &lt;a class="link" href="https://docs.stack.jimmycai.com/" target="_blank" rel="noopener"
+>https://docs.stack.jimmycai.com/&lt;/a>&lt;/p></description></item><item><title>Hello World</title><link>https://frozenlychees.github.io/p/hello-world/</link><pubDate>Sun, 06 Mar 2022 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/hello-world/</guid><description>&lt;img src="https://frozenlychees.github.io/p/hello-world/cover.jpg" alt="Featured image of post Hello World" />&lt;p>Welcome to Hugo theme Stack. This is your first post. Edit or delete it, then start writing!&lt;/p>
+&lt;p>For more information about this theme, check the documentation: &lt;a class="link" href="https://docs.stack.jimmycai.com/" target="_blank" rel="noopener"
+>https://docs.stack.jimmycai.com/&lt;/a>&lt;/p>
+&lt;p>Want a site like this? Check out &lt;a class="link" href="https://github.com/CaiJimmy/hugo-theme-stack-starter" target="_blank" rel="noopener"
+>hugo-theme-stack-stater&lt;/a>&lt;/p>
+&lt;blockquote>
+&lt;p>Photo by &lt;a class="link" href="https://unsplash.com/@pawel_czerwinski" target="_blank" rel="noopener"
+>Pawel Czerwinski&lt;/a> on &lt;a class="link" href="https://unsplash.com/" target="_blank" rel="noopener"
+>Unsplash&lt;/a>&lt;/p>
+&lt;/blockquote></description></item></channel></rss>

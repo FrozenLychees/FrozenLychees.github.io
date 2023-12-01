@@ -1,0 +1,298 @@
+<!doctype html><html lang=en-us dir=ltr><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="Lua 源码阅读笔记-Table lua版本基于5.4.6， 文章更多是记录自己在阅读的是思绪，而非科普。
+很多源码比较长，直接贴不太好，建议阅读时配合着源码一起。
+如果内容有问题或者不正确的地方，欢迎留言讨论。
+Lua的Table Lua的table 比较灵活，可以同时作为数组和字典，在内部实现上实际是有区分这两个类型的。
+首先看一下Table的基本结构
+1 2 3 4 5 6 7 8 9 10 11 typedef struct Table { CommonHeader; lu_byte flags; /* 1&amp;lt;&amp;lt;p means tagmethod(p) is not present */ lu_byte lsizenode; /* log2 of size of &amp;#39;node&amp;#39; array */ unsigned int alimit; /* &amp;#34;limit&amp;#34; of &amp;#39;array&amp;#39; array */ TValue *array; /* array part */ Node *node; Node *lastfree; /* any free position is before this position */ struct Table *metatable; GCObject *gclist; } Table; flags lsizenode: log2(字典大小) 的结果， 这边也还说明作为字典的时候，大小一定是2的倍数 alimit: 看起来是数组的大小，但不一定时准确的数组大小 array： 当table是数组时，指向使用的内存位置 node: 当table是字典时，指向使用的内存位置 lastfree: 当table刚申请的时候，指向table的末尾，冲突时会向前移动这个指针，找到一个空闲的位置"><title>Lua 源码阅读笔记-Table</title>
+<link rel=canonical href=https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/><link rel=stylesheet href=/scss/style.min.abbd69b2908fdfcd5179898beaafd374514a86538d81639ddd2c58c06ae54e40.css><meta property="og:title" content="Lua 源码阅读笔记-Table"><meta property="og:description" content="Lua 源码阅读笔记-Table lua版本基于5.4.6， 文章更多是记录自己在阅读的是思绪，而非科普。
+很多源码比较长，直接贴不太好，建议阅读时配合着源码一起。
+如果内容有问题或者不正确的地方，欢迎留言讨论。
+Lua的Table Lua的table 比较灵活，可以同时作为数组和字典，在内部实现上实际是有区分这两个类型的。
+首先看一下Table的基本结构
+1 2 3 4 5 6 7 8 9 10 11 typedef struct Table { CommonHeader; lu_byte flags; /* 1&amp;lt;&amp;lt;p means tagmethod(p) is not present */ lu_byte lsizenode; /* log2 of size of &amp;#39;node&amp;#39; array */ unsigned int alimit; /* &amp;#34;limit&amp;#34; of &amp;#39;array&amp;#39; array */ TValue *array; /* array part */ Node *node; Node *lastfree; /* any free position is before this position */ struct Table *metatable; GCObject *gclist; } Table; flags lsizenode: log2(字典大小) 的结果， 这边也还说明作为字典的时候，大小一定是2的倍数 alimit: 看起来是数组的大小，但不一定时准确的数组大小 array： 当table是数组时，指向使用的内存位置 node: 当table是字典时，指向使用的内存位置 lastfree: 当table刚申请的时候，指向table的末尾，冲突时会向前移动这个指针，找到一个空闲的位置"><meta property="og:url" content="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/"><meta property="og:site_name" content="FrozenLychees"><meta property="og:type" content="article"><meta property="article:section" content="Post"><meta property="article:published_time" content="2023-09-23T00:00:00+00:00"><meta property="article:modified_time" content="2023-09-23T00:00:00+00:00"><meta property="og:image" content="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/lua.png"><meta name=twitter:title content="Lua 源码阅读笔记-Table"><meta name=twitter:description content="Lua 源码阅读笔记-Table lua版本基于5.4.6， 文章更多是记录自己在阅读的是思绪，而非科普。
+很多源码比较长，直接贴不太好，建议阅读时配合着源码一起。
+如果内容有问题或者不正确的地方，欢迎留言讨论。
+Lua的Table Lua的table 比较灵活，可以同时作为数组和字典，在内部实现上实际是有区分这两个类型的。
+首先看一下Table的基本结构
+1 2 3 4 5 6 7 8 9 10 11 typedef struct Table { CommonHeader; lu_byte flags; /* 1&amp;lt;&amp;lt;p means tagmethod(p) is not present */ lu_byte lsizenode; /* log2 of size of &amp;#39;node&amp;#39; array */ unsigned int alimit; /* &amp;#34;limit&amp;#34; of &amp;#39;array&amp;#39; array */ TValue *array; /* array part */ Node *node; Node *lastfree; /* any free position is before this position */ struct Table *metatable; GCObject *gclist; } Table; flags lsizenode: log2(字典大小) 的结果， 这边也还说明作为字典的时候，大小一定是2的倍数 alimit: 看起来是数组的大小，但不一定时准确的数组大小 array： 当table是数组时，指向使用的内存位置 node: 当table是字典时，指向使用的内存位置 lastfree: 当table刚申请的时候，指向table的末尾，冲突时会向前移动这个指针，找到一个空闲的位置"><meta name=twitter:card content="summary_large_image"><meta name=twitter:image content="https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/lua.png"><link rel="shortcut icon" href=/favicon.png><script async src="https://www.googletagmanager.com/gtag/js?id=G-KCSZNN6B9X"></script><script>var doNotTrack=!1;if(!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-KCSZNN6B9X",{anonymize_ip:!1})}</script></head><body class=article-page><script>(function(){const e="StackColorScheme";localStorage.getItem(e)||localStorage.setItem(e,"auto")})()</script><script>(function(){const t="StackColorScheme",e=localStorage.getItem(t),n=window.matchMedia("(prefers-color-scheme: dark)").matches===!0;e=="dark"||e==="auto"&&n?document.documentElement.dataset.scheme="dark":document.documentElement.dataset.scheme="light"})()</script><div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky"><button class="hamburger hamburger--spin" type=button id=toggle-menu aria-label="Toggle Menu">
+<span class=hamburger-box><span class=hamburger-inner></span></span></button><header><figure class=site-avatar><a href=/><img src=/img/forzenLychees_hu37a7bdcb42ab612cba5e97cb656326c4_12028_300x0_resize_q75_box.jpg width=300 height=300 class=site-logo loading=lazy alt=Avatar>
+</a><span class=emoji>🍥</span></figure><div class=site-meta><h1 class=site-name><a href=/>FrozenLychees</a></h1><h2 class=site-description>天天摸鱼身体棒</h2></div></header><ol class=social-menu><li><a href=https://github.com/FrozenLychees target=_blank title=GitHub rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6.0 00-1.3-3.2 4.2 4.2.0 00-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3.0 00-6.2.0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2.0 00-.1 3.2A4.6 4.6.0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a></li><li><a href=https://twitter.com target=_blank title=Twitter rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-1.265-2.783-1.335-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84.0 00.497-3.753C20.18 7.773 21.692 5.25 22 4.009z"/></svg></a></li></ol><ol class=menu id=main-menu><li><a href=/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/><path d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"/></svg><span>Home</span></a></li><li><a href=/archives/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><rect x="3" y="4" width="18" height="4" rx="2"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg><span>Archives</span></a></li><li><a href=/search/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg><span>Search</span></a></li><li><a href=/links/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 14a3.5 3.5.0 005 0l4-4a3.5 3.5.0 00-5-5l-.5.5"/><path d="M14 10a3.5 3.5.0 00-5 0l-4 4a3.5 3.5.0 005 5l.5-.5"/></svg><span>Links</span></a></li><div class=menu-bottom-section><li id=dark-mode-toggle><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="8" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="16" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg><span>Dark Mode</span></li></div></ol></aside><aside class="sidebar right-sidebar sticky"><section class="widget archives"><div class=widget-icon><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="11" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="13" y2="20"/></svg></div><h2 class="widget-title section-title">Table of contents</h2><div class=widget--toc><nav id=TableOfContents><ol><li><a href=#lua的table>Lua的Table</a></li></ol><ol><li><a href=#luah_getshortstr>luaH_getshortstr</a></li><li><a href=#luah_getint>luaH_getint</a></li><li><a href=#getgeneric>getgeneric</a></li></ol><ol><li><a href=#luah_finishset>luaH_finishset</a></li><li><a href=#rehash>rehash</a></li><li><a href=#取长度操作>取长度操作</a></li></ol></nav></div></section></aside><main class="main full-width"><article class="has-image main-article"><header class=article-header><div class=article-image><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/lua_hu6ff96f9ffb862f590efa749594cf5427_183040_800x0_resize_box_3.png srcset="/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/lua_hu6ff96f9ffb862f590efa749594cf5427_183040_800x0_resize_box_3.png 800w, /p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/lua_hu6ff96f9ffb862f590efa749594cf5427_183040_1600x0_resize_box_3.png 1600w" width=800 height=340 loading=lazy alt="Featured image of post Lua 源码阅读笔记-Table"></a></div><div class=article-details><header class=article-category><a href=/categories/lua/>Lua</a></header><div class=article-title-wrapper><h2 class=article-title><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/>Lua 源码阅读笔记-Table</a></h2></div><footer class=article-time><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M11.795 21H5a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v4"/><circle cx="18" cy="18" r="4"/><path d="M15 3v4"/><path d="M7 3v4"/><path d="M3 11h16"/><path d="M18 16.496V18l1 1"/></svg><time class=article-time--published>Aug 96, 232312</time></div><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg><time class=article-time--reading>5 minute read</time></div></footer></div></header><section class=article-content><h1 id=lua-源码阅读笔记-table>Lua 源码阅读笔记-Table</h1><p>lua版本基于5.4.6， 文章更多是记录自己在阅读的是思绪，而非科普。</p><p>很多源码比较长，直接贴不太好，建议阅读时配合着源码一起。</p><p>如果内容有问题或者不正确的地方，欢迎留言讨论。</p><h2 id=lua的table>Lua的Table</h2><p>Lua的table 比较灵活，可以同时作为数组和字典，在内部实现上实际是有区分这两个类型的。</p><p>首先看一下Table的基本结构</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>typedef struct Table {
+</span></span><span class=line><span class=cl>  CommonHeader;
+</span></span><span class=line><span class=cl>  lu_byte flags;  /* 1&lt;&lt;p means tagmethod(p) is not present */
+</span></span><span class=line><span class=cl>  lu_byte lsizenode;  /* log2 of size of &#39;node&#39; array */
+</span></span><span class=line><span class=cl>  unsigned int alimit;  /* &#34;limit&#34; of &#39;array&#39; array */
+</span></span><span class=line><span class=cl>  TValue *array;  /* array part */
+</span></span><span class=line><span class=cl>  Node *node;
+</span></span><span class=line><span class=cl>  Node *lastfree;  /* any free position is before this position */
+</span></span><span class=line><span class=cl>  struct Table *metatable;
+</span></span><span class=line><span class=cl>  GCObject *gclist;
+</span></span><span class=line><span class=cl>} Table;
+</span></span></code></pre></td></tr></table></div></div><p>flags
+lsizenode: log2(字典大小) 的结果， 这边也还说明作为字典的时候，大小一定是2的倍数
+alimit: 看起来是数组的大小，但不一定时准确的数组大小
+array： 当table是数组时，指向使用的内存位置
+node: 当table是字典时，指向使用的内存位置
+lastfree: 当table刚申请的时候，指向table的末尾，冲突时会向前移动这个指针，找到一个空闲的位置</p><p>metatable: 指向这个表的原表
+gclist: gc相关链表</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>typedef struct TValue {
+</span></span><span class=line><span class=cl>  TValuefields;
+</span></span><span class=line><span class=cl>} TValue;
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>typedef union Node {
+</span></span><span class=line><span class=cl>  struct NodeKey {
+</span></span><span class=line><span class=cl>    TValuefields;  /* fields for value */
+</span></span><span class=line><span class=cl>    lu_byte key_tt;  /* key type */
+</span></span><span class=line><span class=cl>    int next;  /* for chaining */
+</span></span><span class=line><span class=cl>    Value key_val;  /* key value */
+</span></span><span class=line><span class=cl>  } u;
+</span></span><span class=line><span class=cl>  TValue i_val;  /* direct access to node&#39;s value as a proper &#39;TValue&#39; */
+</span></span><span class=line><span class=cl>} Node;
+</span></span></code></pre></td></tr></table></div></div><p>node 对象的组成实际上就是NodeKey， 虽然整个Node是union标识的，但实际上NodeKey这个结构体的第一个字段和TValue 是一样的，所以i_val只是一个快速访问node中value的字段的方式。</p><p>回到NodeKey上面，NodeKey由以下字段组成</p><ul><li>TValuefields 存储value的类型和值(或者指针)</li><li>key_tt key的类型</li><li>key_val key 的值</li><li>next hash冲突时使用链表来解决。</li></ul><p><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/luaTableStruct.png width=599 height=442 srcset="/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/luaTableStruct_hub0d78077bdecf60d248d0e8f74606f7b_77866_480x0_resize_box_3.png 480w, /p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/luaTableStruct_hub0d78077bdecf60d248d0e8f74606f7b_77866_1024x0_resize_box_3.png 1024w" loading=lazy alt="Alt text" class=gallery-image data-flex-grow=135 data-flex-basis=325px></p><p>这边附上《lua设计与实现》 一书中的对于表结构的图，注意书中是LUA5.1的结构，我阅读的时LUA5.4稍微有点区别，但基本类似, 图方便没有自己画图。</p><h1 id=table-的搜索>table 的搜索</h1><p>先看以下对于一个table，lua是怎么尝试找到对应的值的。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=o>/*</span>
+</span></span><span class=line><span class=cl><span class=o>**</span> <span class=n>main</span> <span class=n>search</span> <span class=n>function</span>
+</span></span><span class=line><span class=cl><span class=o>*/</span>
+</span></span><span class=line><span class=cl><span class=k>const</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>luaH_get</span> <span class=p>(</span><span class=n>Table</span> <span class=o>*</span><span class=n>t</span><span class=p>,</span> <span class=k>const</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>key</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=k>switch</span> <span class=p>(</span><span class=n>ttypetag</span><span class=p>(</span><span class=n>key</span><span class=p>))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>case</span> <span class=n>LUA_VSHRSTR</span><span class=p>:</span> <span class=k>return</span> <span class=n>luaH_getshortstr</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=n>tsvalue</span><span class=p>(</span><span class=n>key</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>    <span class=k>case</span> <span class=n>LUA_VNUMINT</span><span class=p>:</span> <span class=k>return</span> <span class=n>luaH_getint</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=n>ivalue</span><span class=p>(</span><span class=n>key</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>    <span class=k>case</span> <span class=n>LUA_VNIL</span><span class=p>:</span> <span class=k>return</span> <span class=o>&amp;</span><span class=n>absentkey</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=k>case</span> <span class=n>LUA_VNUMFLT</span><span class=p>:</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=n>lua_Integer</span> <span class=n>k</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>      <span class=k>if</span> <span class=p>(</span><span class=n>luaV_flttointeger</span><span class=p>(</span><span class=n>fltvalue</span><span class=p>(</span><span class=n>key</span><span class=p>),</span> <span class=o>&amp;</span><span class=n>k</span><span class=p>,</span> <span class=n>F2Ieq</span><span class=p>))</span> <span class=o>/*</span> <span class=n>integral</span> <span class=n>index</span><span class=err>?</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>        <span class=k>return</span> <span class=n>luaH_getint</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=n>k</span><span class=p>);</span>  <span class=o>/*</span> <span class=n>use</span> <span class=n>specialized</span> <span class=n>version</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>      <span class=o>/*</span> <span class=k>else</span><span class=o>...</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>  <span class=o>/*</span> <span class=n>FALLTHROUGH</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>    <span class=n>default</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>      <span class=k>return</span> <span class=n>getgeneric</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=n>key</span><span class=p>,</span> <span class=mi>0</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>对于一个table和一个指定的key，会根据key的类型来决定调用什么方式搜索；</p><ul><li>当key 是short str的时候，会调用luaH_getshortstr</li><li>当key 是int 或者是 等于整数的float的时候，会调用luaH_getint</li><li>当key 是nil的时候，直接返回absentkey（不存在的key</li><li>其他情况调用getgeneric</li></ul><h2 id=luah_getshortstr>luaH_getshortstr</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=k>const</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>luaH_getshortstr</span> <span class=p>(</span><span class=n>Table</span> <span class=o>*</span><span class=n>t</span><span class=p>,</span> <span class=n>TString</span> <span class=o>*</span><span class=n>key</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=ne>Node</span> <span class=o>*</span><span class=n>n</span> <span class=o>=</span> <span class=n>hashstr</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=n>key</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=n>lua_assert</span><span class=p>(</span><span class=n>key</span><span class=o>-&gt;</span><span class=n>tt</span> <span class=o>==</span> <span class=n>LUA_VSHRSTR</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=k>for</span> <span class=p>(;;)</span> <span class=p>{</span>  <span class=o>/*</span> <span class=n>check</span> <span class=n>whether</span> <span class=s1>&#39;key&#39;</span> <span class=n>is</span> <span class=n>somewhere</span> <span class=ow>in</span> <span class=n>the</span> <span class=n>chain</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=p>(</span><span class=n>keyisshrstr</span><span class=p>(</span><span class=n>n</span><span class=p>)</span> <span class=o>&amp;&amp;</span> <span class=n>eqshrstr</span><span class=p>(</span><span class=n>keystrval</span><span class=p>(</span><span class=n>n</span><span class=p>),</span> <span class=n>key</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>      <span class=k>return</span> <span class=n>gval</span><span class=p>(</span><span class=n>n</span><span class=p>);</span>  <span class=o>/*</span> <span class=n>that</span><span class=s1>&#39;s it */</span>
+</span></span><span class=line><span class=cl>    <span class=k>else</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=ne>int</span> <span class=n>nx</span> <span class=o>=</span> <span class=n>gnext</span><span class=p>(</span><span class=n>n</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>      <span class=k>if</span> <span class=p>(</span><span class=n>nx</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=k>return</span> <span class=o>&amp;</span><span class=n>absentkey</span><span class=p>;</span>  <span class=o>/*</span> <span class=ow>not</span> <span class=n>found</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>      <span class=n>n</span> <span class=o>+=</span> <span class=n>nx</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>获取字符串的hash值，然后判断对应的node是不是short str类型 且是否和key相等，相等则返回对应的value；不是的话则通过next字段找到下一个node。这边看方式next存的不是下一个node的指针，而是偏移。</p><h2 id=luah_getint>luaH_getint</h2><p>这个函数的步骤大概如下：</p><ol><li>确认key的范围是不是在数组大小内，即 0&lt; key &lt; alimit, 如果是则直接返回array[key - 1]</li><li>如果alimit不是真实的数组长度，且key是在真实范围内的话，则也直接返回array<a class=link href=%e8%bf%99%e8%be%b9%e4%b8%8d%e6%98%af%e7%9c%9f%e5%ae%9e%e7%9a%84%e6%95%b0%e7%bb%84%e9%95%bf%e5%ba%a6%e5%8e%9f%e5%9b%a0%e5%a5%bd%e5%83%8f%e6%98%af%e5%9b%a0%e4%b8%ba%e6%95%b0%e7%bb%84%e4%b8%ad%e5%8c%85%e5%90%ab%e4%ba%86nil>key - 1</a></li><li>尝试用字典的方式在搜索一波key。</li><li>都失败了则返回absentkey。</li></ol><h2 id=getgeneric>getgeneric</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=k>static</span> <span class=k>const</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>getgeneric</span> <span class=p>(</span><span class=n>Table</span> <span class=o>*</span><span class=n>t</span><span class=p>,</span> <span class=k>const</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>key</span><span class=p>,</span> <span class=ne>int</span> <span class=n>deadok</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=ne>Node</span> <span class=o>*</span><span class=n>n</span> <span class=o>=</span> <span class=n>mainpositionTV</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=n>key</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=k>for</span> <span class=p>(;;)</span> <span class=p>{</span>  <span class=o>/*</span> <span class=n>check</span> <span class=n>whether</span> <span class=s1>&#39;key&#39;</span> <span class=n>is</span> <span class=n>somewhere</span> <span class=ow>in</span> <span class=n>the</span> <span class=n>chain</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=p>(</span><span class=n>equalkey</span><span class=p>(</span><span class=n>key</span><span class=p>,</span> <span class=n>n</span><span class=p>,</span> <span class=n>deadok</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>      <span class=k>return</span> <span class=n>gval</span><span class=p>(</span><span class=n>n</span><span class=p>);</span>  <span class=o>/*</span> <span class=n>that</span><span class=s1>&#39;s it */</span>
+</span></span><span class=line><span class=cl>    <span class=k>else</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=ne>int</span> <span class=n>nx</span> <span class=o>=</span> <span class=n>gnext</span><span class=p>(</span><span class=n>n</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>      <span class=k>if</span> <span class=p>(</span><span class=n>nx</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=k>return</span> <span class=o>&amp;</span><span class=n>absentkey</span><span class=p>;</span>  <span class=o>/*</span> <span class=ow>not</span> <span class=n>found</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>      <span class=n>n</span> <span class=o>+=</span> <span class=n>nx</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>getgeneric 函数就是完全将table当作hash表来进行搜索了。搜索代码上和short hash 基本一样的，先通过mainpositionTV获取key的第一个位置，然后通过这个位置不断的在table中寻找匹配的key。</p><p>mainpositionTV 中会通过key的类型来获取对应的hash值。</p><h1 id=table的插入>table的插入</h1><p>table 插入的入口看起来是luaH_set</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>void</span> <span class=n>luaH_set</span> <span class=p>(</span><span class=n>lua_State</span> <span class=o>*</span><span class=n>L</span><span class=p>,</span> <span class=n>Table</span> <span class=o>*</span><span class=n>t</span><span class=p>,</span> <span class=k>const</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>key</span><span class=p>,</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>value</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=k>const</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>slot</span> <span class=o>=</span> <span class=n>luaH_get</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=n>key</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=n>luaH_finishset</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>t</span><span class=p>,</span> <span class=n>key</span><span class=p>,</span> <span class=n>slot</span><span class=p>,</span> <span class=n>value</span><span class=p>);</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>整个函数就2行，找到一个key，然后设置成对应的value</p><h2 id=luah_finishset>luaH_finishset</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>void</span> <span class=n>luaH_finishset</span> <span class=p>(</span><span class=n>lua_State</span> <span class=o>*</span><span class=n>L</span><span class=p>,</span> <span class=n>Table</span> <span class=o>*</span><span class=n>t</span><span class=p>,</span> <span class=k>const</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>key</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                                   <span class=k>const</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>slot</span><span class=p>,</span> <span class=n>TValue</span> <span class=o>*</span><span class=n>value</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=k>if</span> <span class=p>(</span><span class=n>isabstkey</span><span class=p>(</span><span class=n>slot</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>    <span class=n>luaH_newkey</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>t</span><span class=p>,</span> <span class=n>key</span><span class=p>,</span> <span class=n>value</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=k>else</span>
+</span></span><span class=line><span class=cl>    <span class=n>setobj2t</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>cast</span><span class=p>(</span><span class=n>TValue</span> <span class=o>*</span><span class=p>,</span> <span class=n>slot</span><span class=p>),</span> <span class=n>value</span><span class=p>);</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>在luaH_finishset中，如果slot查找出来是absentkey，则会调用luaH_newkey创建新的key，不然就直接设置value即可。</p><p>luaH_newkey 函数比较长，建议对照源码来看.</p><ol><li>首先先要确认key和value 的类型，当key或者value为nil的时候，是不允许插入的。如果key是float且能转成int 的话，则key会被当做int进行插入。</li><li>通过mainpositionTV来找到对应的node</li><li>如果发现需要扩容，则执行rehash，然后递归重新执行luaH_set。</li><li>如果找到的node已经有数据的话，则通过这步找到一个新的位置；</li><li>将找到的node的key和value都设置好。</li></ol><p>这边的第3、4步代码如下：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>  mp = mainpositionTV(t, key);
+</span></span><span class=line><span class=cl>  
+</span></span><span class=line><span class=cl>  // 判断是否冲突或者hash表的lastfree为空
+</span></span><span class=line><span class=cl>  if (!isempty(gval(mp)) || isdummy(t)) {  /* main position is taken? */
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    // 先找一个空位来放这个元素
+</span></span><span class=line><span class=cl>    // getfreepos 默认都是从内存块的最后往前找一个没元素的位置
+</span></span><span class=line><span class=cl>    Node *othern;
+</span></span><span class=line><span class=cl>    Node *f = getfreepos(t);  /* get a free place */
+</span></span><span class=line><span class=cl>    if (f == NULL) {  /* cannot find a free place? */
+</span></span><span class=line><span class=cl>      // 没位置了就rehash
+</span></span><span class=line><span class=cl>      rehash(L, t, key);  /* grow table */
+</span></span><span class=line><span class=cl>      /* whatever called &#39;newkey&#39; takes care of TM cache */
+</span></span><span class=line><span class=cl>      luaH_set(L, t, key, value);  /* insert key into grown table */
+</span></span><span class=line><span class=cl>      return;
+</span></span><span class=line><span class=cl>    }
+</span></span><span class=line><span class=cl>    lua_assert(!isdummy(t));
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    // 将碰撞位置的元素进行一次hash来判断这个元素是否应该在这里
+</span></span><span class=line><span class=cl>    othern = mainpositionfromnode(t, mp);
+</span></span><span class=line><span class=cl>    if (othern != mp) {  /* is colliding node out of its main position? */
+</span></span><span class=line><span class=cl>      /* yes; move colliding node into free position */
+</span></span><span class=line><span class=cl>      // 将碰撞的元素找到一个新的位置插入
+</span></span><span class=line><span class=cl>      while (othern + gnext(othern) != mp)  /* find previous */
+</span></span><span class=line><span class=cl>        othern += gnext(othern);
+</span></span><span class=line><span class=cl>      gnext(othern) = cast_int(f - othern);  /* rechain to point to &#39;f&#39; */
+</span></span><span class=line><span class=cl>      *f = *mp;  /* copy colliding node into free pos. (mp-&gt;next also goes) */
+</span></span><span class=line><span class=cl>      // 将新元素插入到原来碰撞元素的位置
+</span></span><span class=line><span class=cl>      if (gnext(mp) != 0) {
+</span></span><span class=line><span class=cl>        gnext(f) += cast_int(mp - f);  /* correct &#39;next&#39; */
+</span></span><span class=line><span class=cl>        gnext(mp) = 0;  /* now &#39;mp&#39; is free */
+</span></span><span class=line><span class=cl>      }
+</span></span><span class=line><span class=cl>      setempty(gval(mp));
+</span></span><span class=line><span class=cl>    }
+</span></span><span class=line><span class=cl>    else {  
+</span></span><span class=line><span class=cl>      // 碰撞的位置是对应位置上的元素，则将新位置链接到这个元素后面
+</span></span><span class=line><span class=cl>      /* colliding node is in its own main position */
+</span></span><span class=line><span class=cl>      /* new node will go into free position */
+</span></span><span class=line><span class=cl>      if (gnext(mp) != 0)
+</span></span><span class=line><span class=cl>        gnext(f) = cast_int((mp + gnext(mp)) - f);  /* chain new position */
+</span></span><span class=line><span class=cl>      else lua_assert(gnext(f) == 0);
+</span></span><span class=line><span class=cl>      gnext(mp) = cast_int(f - mp);
+</span></span><span class=line><span class=cl>      mp = f;
+</span></span><span class=line><span class=cl>    }
+</span></span><span class=line><span class=cl>  }
+</span></span></code></pre></td></tr></table></div></div><p>lua的table和其他dict实现的有点不太一样，以Python为例子，Python的hash表实现是hash表和元素节点的内存是分开的，hash表中存的是元素的链表。但Lua中hash表和元素是共用内存的，即hash表存的就是元素。</p><p>而且冲突的时候的处理也挺不一致的。python因为元素内存是额外申请的，所以找到位置后直接修改链表即可。而Lua在冲突的时候，是通过lastfree指针在hash表从后往前找一个空闲的元素位置，然后根据冲突节点来判断这个空闲的位置到底是给新节点还是冲突节点。</p><p>感觉这种实现的话，应该是为内存效率做考虑，但代价就是冲突处理的效率肯定是低于其他实现的，同时table删除元素是将对应的value修改成nil来实现的，所以lastfree指针只会不断向前，对于会频繁增删的hash表来说，应该是会造成rehash的次数上涨的。</p><h2 id=rehash>rehash</h2><p>lua table的rehash因为同时包含数组和hash表的，所以在rehash的时候，会同时改变这两个部分的内容。luaH_resize才是真正重新分配内存的地方，而之前的部分都是为了计算出一个新的数组大小和hash表大小。
+主要涉及到一下几个变量：</p><ul><li>totaluse 表示所有key的总和</li><li>na表示数字部分的key的总和</li><li>nums 一个统计数组，nums[i] 表示 在 （2^(i - 1)， 2^i] 之间的数字key的个数</li></ul><p>这几个变量会在computesizes 中计算出一个合适的新的数组部分大小asize，用来存储数字部分的key。computesizes函数的主要思路应该是算出一个最小的2的N次幂，使得其中数字key在[1, 2^N]的分布能够小于50%。
+而剩余的key就会认为应该是在hash表的部分，所以totaluse - asize 就是新的hash表大小。</p><p>luaH_resize 就会对这两个新的大小进行内存的重新分配和元素迁移。数组分部申请新的内存，然后直接内存拷贝相同大小部分的数据。hash表部分遍历全表，找到非nil元素进行搬迁，重新调用luaH_set对新table进行插入，这样需要搬迁到数组部分的元素也就会迁移过去了。</p><h2 id=取长度操作>取长度操作</h2><p>通过#操作来对table获取长度的操作实际上不是常规意义上的取长度.
+&lsquo;#&lsquo;操作符通过 luaH_getn 来完成，luaH_getn实际上是返回n，满足a[1]~a[n]所有元素不为空
+以下面的代码为例子：</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>a = {4, 5, nil, nil，6}
+</span></span><span class=line><span class=cl>print(#a)
+</span></span><span class=line><span class=cl>&gt;&gt; 5  -- 刚创建，所以初始化了数组长度，返回的还是5
+</span></span><span class=line><span class=cl>a[6] = 1
+</span></span><span class=line><span class=cl>print(#a) 
+</span></span><span class=line><span class=cl>&gt;&gt; 2  --多塞入一个，造成了rehash，数组长度需要通过luaH_getn来获得
+</span></span></code></pre></td></tr></table></div></div><p>这边就可以看出，只要通过luaH_getn来获取长度，如果数组包含nil，那么获取的结果就不一定是完整的数组的长度。</p><p>luaH_getn 实现实际上是通过二分的方式来找满足 a[n - 1] ~= nil and a[n] == nil</p><p>这边就不分析具体代码了。</p><h1 id=总结>总结</h1><p>通过阅读table的增删查改，感觉到LUA对于table的实现上更注重内存的使用，所带来的代价就是rehash 和冲突解决的消耗变高了。</p><p>貌似table默认也不支持取正确的长度，可能在需要table长度的时候需要注意自己维护一下，避免每次都遍历table来获取长度</p><h1 id=引用>引用</h1><p>1.《lua设计与实现》</p></section><footer class=article-footer><section class=article-copyright><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><path d="M14.5 9a3.5 4 0 100 6"/></svg><span>Licensed under CC BY-NC-SA 4.0</span></section></footer></article><aside class=related-content--wrapper><h2 class=section-title>Related content</h2><div class=related-content><div class="flex article-list--tile"><article class=has-image><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-chunk-%E5%8A%A0%E8%BD%BD%E7%9B%B8%E5%85%B3/><div class=article-image><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-chunk-%E5%8A%A0%E8%BD%BD%E7%9B%B8%E5%85%B3/lua.7d4a78cb68c4bf6f949bf65679bd0293_hu6ff96f9ffb862f590efa749594cf5427_183040_250x150_fill_box_smart1_3.png width=250 height=150 loading=lazy alt="Featured image of post Lua 源码阅读笔记-chunk 加载相关" data-hash="md5-fUp4y2jEv2+Um/ZWeb0Ckw=="></div><div class=article-details><h2 class=article-title>Lua 源码阅读笔记-chunk 加载相关</h2></div></a></article><article class=has-image><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/><div class=article-image><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/lua.7d4a78cb68c4bf6f949bf65679bd0293_hu6ff96f9ffb862f590efa749594cf5427_183040_250x150_fill_box_smart1_3.png width=250 height=150 loading=lazy alt="Featured image of post Lua 源码阅读笔记-String" data-hash="md5-fUp4y2jEv2+Um/ZWeb0Ckw=="></div><div class=article-details><h2 class=article-title>Lua 源码阅读笔记-String</h2></div></a></article><article class=has-image><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/><div class=article-image><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/lua.7d4a78cb68c4bf6f949bf65679bd0293_hu6ff96f9ffb862f590efa749594cf5427_183040_250x150_fill_box_smart1_3.png width=250 height=150 loading=lazy alt="Featured image of post Lua 源码阅读笔记-基本类型" data-hash="md5-fUp4y2jEv2+Um/ZWeb0Ckw=="></div><div class=article-details><h2 class=article-title>Lua 源码阅读笔记-基本类型</h2></div></a></article></div></div></aside><script src=https://utteranc.es/client.js repo=FrozenLychees/FrozenLychees.github.io issue-term=pathname label=comments crossorigin=anonymous async></script><style>.utterances{max-width:unset}</style><script>let utterancesLoaded=!1;function setUtterancesTheme(e){let t=document.querySelector(".utterances iframe");t&&t.contentWindow.postMessage({type:"set-theme",theme:`github-${e}`},"https://utteranc.es")}addEventListener("message",e=>{if(e.origin!=="https://utteranc.es")return;utterancesLoaded=!0,setUtterancesTheme(document.documentElement.dataset.scheme)}),window.addEventListener("onColorSchemeChange",e=>{if(!utterancesLoaded)return;setUtterancesTheme(e.detail)})</script><footer class=site-footer><section class=copyright>&copy;
+2020 -
+2023 FrozenLychees</section><section class=powerby>Built with <a href=https://gohugo.io/ target=_blank rel=noopener>Hugo</a><br>Theme <b><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank rel=noopener data-version=3.21.0>Stack</a></b> designed by <a href=https://jimmycai.com target=_blank rel=noopener>Jimmy</a></section></footer><div class=pswp tabindex=-1 role=dialog aria-hidden=true><div class=pswp__bg></div><div class=pswp__scroll-wrap><div class=pswp__container><div class=pswp__item></div><div class=pswp__item></div><div class=pswp__item></div></div><div class="pswp__ui pswp__ui--hidden"><div class=pswp__top-bar><div class=pswp__counter></div><button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+<button class="pswp__button pswp__button--share" title=Share></button>
+<button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+<button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button><div class=pswp__preloader><div class=pswp__preloader__icn><div class=pswp__preloader__cut><div class=pswp__preloader__donut></div></div></div></div></div><div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap"><div class=pswp__share-tooltip></div></div><button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+</button>
+<button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)"></button><div class=pswp__caption><div class=pswp__caption__center></div></div></div></div></div><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo=" crossorigin=anonymous defer></script><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU=" crossorigin=anonymous defer></script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css crossorigin=anonymous><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css crossorigin=anonymous></main></div><script src=https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z+KMkF24hUW8WePSA9HM=" crossorigin=anonymous></script><script type=text/javascript src=/ts/main.js defer></script><script>(function(){const e=document.createElement("link");e.href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap",e.type="text/css",e.rel="stylesheet",document.head.appendChild(e)})()</script></body></html>
