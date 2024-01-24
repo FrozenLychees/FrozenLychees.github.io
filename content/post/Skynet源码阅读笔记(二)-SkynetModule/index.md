@@ -10,65 +10,9 @@ categories:
 
 # Skynet源码阅读笔记-SkynetModule
 
-承接上文，在初始化过程中可以看到 skynet_context_new 来创建logger 服务和 snlua服务，那么接下来就探究一下skynet_context_new会做的事情以及skynet的module
+skynet的服务可以认为是 SkynetModule 的实例，skynet本身自带了4个类型的服务，gate、logger、snlua、 harbor。 自带的这几个服务位于 service-src下。
 
-## skynet_context_new
-
-```
-struct skynet_context * 
-skynet_context_new(const char * name, const char *param) {
-
-    // 根据名字来获取一个module 
-	struct skynet_module * mod = skynet_module_query(name);
-	printf("in skynet_context_new %s %s\n", name, param);
-	if (mod == NULL)
-		return NULL;
-
-    // 创建出module的实例
-	void *inst = skynet_module_instance_create(mod);
-	if (inst == NULL)
-		return NULL;
-
-    // 创建Ctx
-	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
-	CHECKCALLING_INIT(ctx)
-
-	ctx->mod = mod;
-	ctx->instance = inst;
-    //  设置其他cxt的变量初始值
-	ATOM_INIT(&ctx->ref , 2);
-    .......
-
-	CHECKCALLING_BEGIN(ctx)
-    // mod 初始化
-	int r = skynet_module_instance_init(mod, inst, ctx, param);
-	CHECKCALLING_END(ctx)
-	if (r == 0) {
-        // 没问题就塞进全局队列中返回
-		struct skynet_context * ret = skynet_context_release(ctx);
-		if (ret) {
-			ctx->init = true;
-		}
-		skynet_globalmq_push(queue);
-		if (ret) {
-			skynet_error(ret, "LAUNCH %s %s", name, param ? param : "");
-		}
-		return ret;
-	} else {
-        //否则报错
-		skynet_error(ctx, "FAILED launch %s", name);
-		uint32_t handle = ctx->handle;
-		skynet_context_release(ctx);
-		skynet_handle_retire(handle);
-		struct drop_t d = { handle };
-		skynet_mq_release(queue, drop_message, &d);
-		return NULL;
-	}
-}
-```
-skynet_context_new主要是对skynet_context这个结构体进行初始化和返回，skynet_context结构包含了比较多的其他结构和变量，这次主要先探究module相关的
-
-## skynet_module
+## skynet_module 基本机构
 先看看skynet_module的结构
 ```
 typedef void * (*skynet_dl_create)(void);
@@ -89,8 +33,17 @@ struct skynet_module {
 
 在skynet_context_new中有一个skynet_module_query，这个函数会将module导入进来
 
+```
+struct modules {
+	int count;
+	struct spinlock lock;
+	const char * path;
+	struct skynet_module m[MAX_MODULE_TYPE];
+};
+```
+导入进来的 skynet_module 会被保存在 modules 的数组中，MAX_MODULE_TYPE 默认是32.
 
-### skynet_module_query
+### skynet_module_query 导入过程
 
 ```
 
@@ -145,6 +98,42 @@ open_sym 是对传入的skynet_module的4个函数进行赋值，里面是使用
 _try_open 实际上是dlopen的包装，在给定的搜索路径内搜索对应的so文件，然后尝试用dlopen打开。
 
 skynet_module.c 内的其他接口就是对结构体内的保存的4个函数地址的封装
+
+## 具体的使用位置
+
+在 skynet_context_new 中可以看到对 skynet-module 的引用， skynet_context_new 在上文中可以看到用来创建logger 以及通过配置创建了snlua
+
+```
+struct skynet_context * 
+skynet_context_new(const char * name, const char *param) {
+
+    // 根据名字来获取一个module 
+	struct skynet_module * mod = skynet_module_query(name);
+	printf("in skynet_context_new %s %s\n", name, param);
+	if (mod == NULL)
+		return NULL;
+
+    // 创建出module的实例
+	void *inst = skynet_module_instance_create(mod);
+	if (inst == NULL)
+		return NULL;
+
+    // 创建Ctx
+	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
+	CHECKCALLING_INIT(ctx)
+
+	ctx->mod = mod;
+	ctx->instance = inst;
+    //  设置其他cxt的变量初始值
+    .......
+	CHECKCALLING_BEGIN(ctx)
+    // mod 初始化
+	int r = skynet_module_instance_init(mod, inst, ctx, param);
+	CHECKCALLING_END(ctx)
+	...
+}
+```
+skynet_context_new 本身是为了创建 skynet_context， 但可以看到 skynet_context 中加载对应 skynet_module , 并创建了对应的实例
 
 ## 小结
 
