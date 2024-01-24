@@ -12,6 +12,40 @@ categories:
 
 skynet的服务可以认为是 SkynetModule 的实例，skynet本身自带了4个类型的服务，gate、logger、snlua、 harbor。 自带的这几个服务位于 service-src下。
 
+承接上文，logger 通过 skynet_context_new 进行创建，在 skynet_context_new 中可以看到对 skynet-module 的引用。
+```
+struct skynet_context * 
+skynet_context_new(const char * name, const char *param) {
+
+    // 根据名字来获取一个module 
+	struct skynet_module * mod = skynet_module_query(name);
+	printf("in skynet_context_new %s %s\n", name, param);
+	if (mod == NULL)
+		return NULL;
+
+    // 创建出module的实例
+	void *inst = skynet_module_instance_create(mod);
+	if (inst == NULL)
+		return NULL;
+
+    // 创建Ctx
+	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
+	CHECKCALLING_INIT(ctx)
+
+	ctx->mod = mod;
+	ctx->instance = inst;
+    //  设置其他cxt的变量初始值
+    .......
+	CHECKCALLING_BEGIN(ctx)
+    // mod 初始化
+	int r = skynet_module_instance_init(mod, inst, ctx, param);
+	CHECKCALLING_END(ctx)
+	...
+}
+```
+skynet_context_new 本身是为了创建 skynet_context， 但可以看到 skynet_context 中加载对应 skynet_module , 并创建了对应的实例， 下面就具体看看怎么实现的。
+
+
 ## skynet_module 基本机构
 先看看skynet_module的结构
 ```
@@ -99,42 +133,7 @@ _try_open 实际上是dlopen的包装，在给定的搜索路径内搜索对应�
 
 skynet_module.c 内的其他接口就是对结构体内的保存的4个函数地址的封装
 
-## 具体的使用位置
-
-在 skynet_context_new 中可以看到对 skynet-module 的引用， skynet_context_new 在上文中可以看到用来创建logger 以及通过配置创建了snlua
-
-```
-struct skynet_context * 
-skynet_context_new(const char * name, const char *param) {
-
-    // 根据名字来获取一个module 
-	struct skynet_module * mod = skynet_module_query(name);
-	printf("in skynet_context_new %s %s\n", name, param);
-	if (mod == NULL)
-		return NULL;
-
-    // 创建出module的实例
-	void *inst = skynet_module_instance_create(mod);
-	if (inst == NULL)
-		return NULL;
-
-    // 创建Ctx
-	struct skynet_context * ctx = skynet_malloc(sizeof(*ctx));
-	CHECKCALLING_INIT(ctx)
-
-	ctx->mod = mod;
-	ctx->instance = inst;
-    //  设置其他cxt的变量初始值
-    .......
-	CHECKCALLING_BEGIN(ctx)
-    // mod 初始化
-	int r = skynet_module_instance_init(mod, inst, ctx, param);
-	CHECKCALLING_END(ctx)
-	...
-}
-```
-skynet_context_new 本身是为了创建 skynet_context， 但可以看到 skynet_context 中加载对应 skynet_module , 并创建了对应的实例
 
 ## 小结
 
-skynet_module 这个结构本身就是对so的一个包装，如果一个so需要通过这种方式加载到skynet内，则需要实现对应的4个方法。
+skynet_module 这个结构本身就是对so的一个包装，如果一个so需要通过这种方式加载到skynet内当作服务的话，则需要实现对应的4个方法。

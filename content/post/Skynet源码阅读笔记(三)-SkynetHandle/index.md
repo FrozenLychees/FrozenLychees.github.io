@@ -12,7 +12,16 @@ categories:
 
 在一个skyent进程中，handle的作用是用来通过它查找对应注册的ctx。
 
-在 skynet_context_new 创建一个新的ctx的时候， 会通过 skynet_handle_register 来获取 ctx 对应的 handle。下面看看具体是怎么玩的。
+e而在 skynet_context_new 创建一个新的ctx的时候， 会通过 skynet_handle_register 来获取 ctx 对应的 handle。下面看看具体是怎么玩的。
+```
+struct skynet_context * 
+skynet_context_new(const char * name, const char *param) {
+	...
+	ctx->handle = 0;	
+	ctx->handle = skynet_handle_register(ctx); 
+	...
+}
+```
 
 ## handle_storage
 先看一下 handle_storage 这个结构
