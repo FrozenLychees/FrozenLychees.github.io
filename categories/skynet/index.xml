@@ -1,0 +1,1637 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>skynet on FrozenLychees</title><link>https://frozenlychees.github.io/categories/skynet/</link><description>Recent content in skynet on FrozenLychees</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Tue, 21 Nov 2023 00:00:00 +0000</lastBuildDate><atom:link href="https://frozenlychees.github.io/categories/skynet/index.xml" rel="self" type="application/rss+xml"/><item><title>Skynet源码阅读笔记-启动流程</title><link>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B/</link><pubDate>Tue, 21 Nov 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B/</guid><description>&lt;img src="https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%90%AF%E5%8A%A8%E6%B5%81%E7%A8%8B/skynet.jpg" alt="Featured image of post Skynet源码阅读笔记-启动流程" />&lt;h1 id="skynet源码阅读笔记-启动流程">Skynet源码阅读笔记-启动流程&lt;/h1>
+&lt;h2 id="主流程">主流程&lt;/h2>
+&lt;p>main函数在skynet_main.c中, 主函数里的流程看起来不算很长，这边全贴出来，然后分块分析&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;span class="lnt">45
+&lt;/span>&lt;span class="lnt">46
+&lt;/span>&lt;span class="lnt">47
+&lt;/span>&lt;span class="lnt">48
+&lt;/span>&lt;span class="lnt">49
+&lt;/span>&lt;span class="lnt">50
+&lt;/span>&lt;span class="lnt">51
+&lt;/span>&lt;span class="lnt">52
+&lt;/span>&lt;span class="lnt">53
+&lt;/span>&lt;span class="lnt">54
+&lt;/span>&lt;span class="lnt">55
+&lt;/span>&lt;span class="lnt">56
+&lt;/span>&lt;span class="lnt">57
+&lt;/span>&lt;span class="lnt">58
+&lt;/span>&lt;span class="lnt">59
+&lt;/span>&lt;span class="lnt">60
+&lt;/span>&lt;span class="lnt">61
+&lt;/span>&lt;span class="lnt">62
+&lt;/span>&lt;span class="lnt">63
+&lt;/span>&lt;span class="lnt">64
+&lt;/span>&lt;span class="lnt">65
+&lt;/span>&lt;span class="lnt">66
+&lt;/span>&lt;span class="lnt">67
+&lt;/span>&lt;span class="lnt">68
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="ne">int&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">main&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="ne">int&lt;/span> &lt;span class="n">argc&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">argv&lt;/span>&lt;span class="p">[])&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="mf">1.&lt;/span> &lt;span class="err">判断是否传入了配置，没有的话就退出了&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">config_file&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">NULL&lt;/span> &lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">argc&lt;/span> &lt;span class="o">&amp;gt;&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">config_file&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">argv&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">];&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span> &lt;span class="k">else&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">fprintf&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">stderr&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;Need a config file. Please read skynet wiki : https://github.com/cloudwu/skynet/wiki/Config&lt;/span>&lt;span class="se">\n&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="s2">&amp;#34;usage: skynet configfilename&lt;/span>&lt;span class="se">\n&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="mf">2.&lt;/span> &lt;span class="err">初始化&lt;/span>&lt;span class="n">skynet的主线程相关的变量&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_globalinit&lt;/span>&lt;span class="p">();&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="mf">3.&lt;/span> &lt;span class="err">初始化&lt;/span>&lt;span class="n">skynet的环境&lt;/span>&lt;span class="err">，其中包括一个&lt;/span>&lt;span class="n">lua环境和一个自旋锁&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_env_init&lt;/span>&lt;span class="p">();&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="mf">4.&lt;/span> &lt;span class="err">信号处理相关&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">sigign&lt;/span>&lt;span class="p">();&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_config&lt;/span> &lt;span class="n">config&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">#ifdef LUA_CACHELIB&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="n">init&lt;/span> &lt;span class="n">the&lt;/span> &lt;span class="n">lock&lt;/span> &lt;span class="n">of&lt;/span> &lt;span class="n">code&lt;/span> &lt;span class="n">cache&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">luaL_initcodecache&lt;/span>&lt;span class="p">();&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="c1">#endif&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">初始化一个&lt;/span>&lt;span class="n">lua虚拟机&lt;/span>&lt;span class="err">，用来读取配置&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">lua_State&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">L&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">luaL_newstate&lt;/span>&lt;span class="p">();&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">luaL_openlibs&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">);&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="n">link&lt;/span> &lt;span class="n">lua&lt;/span> &lt;span class="n">lib&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">执行一段硬编码的&lt;/span>&lt;span class="n">lua代码&lt;/span>&lt;span class="err">，这个代码写在&lt;/span>&lt;span class="n">skynet_main&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">c文件里&lt;/span>&lt;span class="err">，就是&lt;/span>&lt;span class="n">load_config变量所对应的内容&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="n">load_config就是包装load进行的加载配置函数&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">这边是把&lt;/span>&lt;span class="n">load_config变成lua函数然后执行加载&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">err&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">luaL_loadbufferx&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">load_config&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">strlen&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">load_config&lt;/span>&lt;span class="p">),&lt;/span> &lt;span class="s2">&amp;#34;=[skynet config]&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;t&amp;#34;&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="nb">assert&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">err&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="n">LUA_OK&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">lua_pushstring&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">config_file&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">err&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">lua_pcall&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">err&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">fprintf&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">stderr&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="se">\n&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="n">lua_tostring&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="o">-&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">));&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">lua_close&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">这个函数看起来是把刚刚读取的配置设置到&lt;/span>&lt;span class="n">lua&lt;/span> &lt;span class="n">env全局变量中&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">_init_env&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">初始化&lt;/span>&lt;span class="n">skynet的基础配置&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">config&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">thread&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">optint&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;thread&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="mi">8&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">config&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">module_path&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">optstring&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;cpath&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="s2">&amp;#34;./cservice/?.so&amp;#34;&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">config&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">harbor&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">optint&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;harbor&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">config&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">bootstrap&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">optstring&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;bootstrap&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="s2">&amp;#34;snlua bootstrap&amp;#34;&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">config&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">daemon&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">optstring&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;daemon&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">config&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">logger&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">optstring&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;logger&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">config&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">logservice&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">optstring&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;logservice&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;logger&amp;#34;&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">config&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">profile&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">optboolean&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;profile&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">lua_close&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">L&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span>&lt;span class="n">skynet&lt;/span> &lt;span class="err">框架启动&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_start&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">config&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_globalexit&lt;/span>&lt;span class="p">();&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>##skynet_start
+从上面的代码解析，可以清楚的知道，skynet启动的主要函数就是skynet_start，看看它做了什么&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;span class="lnt">45
+&lt;/span>&lt;span class="lnt">46
+&lt;/span>&lt;span class="lnt">47
+&lt;/span>&lt;span class="lnt">48
+&lt;/span>&lt;span class="lnt">49
+&lt;/span>&lt;span class="lnt">50
+&lt;/span>&lt;span class="lnt">51
+&lt;/span>&lt;span class="lnt">52
+&lt;/span>&lt;span class="lnt">53
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">void
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_start(struct skynet_config * config) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // register SIGHUP for log file reopen
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 首先是注册了一个SIGHUP的信号执行函数
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct sigaction sa;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> sa.sa_handler = &amp;amp;handle_hup;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> sa.sa_flags = SA_RESTART;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> sigfillset(&amp;amp;sa.sa_mask);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> sigaction(SIGHUP, &amp;amp;sa, NULL);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 看配置是否创建守护进程
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (config-&amp;gt;daemon) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (daemon_init(config-&amp;gt;daemon)) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> exit(1);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 初始化 Harbor节点的数量
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_harbor_init(config-&amp;gt;harbor);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 初始化handle的存储
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_handle_init(config-&amp;gt;harbor);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 初始化全局消息队列
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_mq_init();
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 初始化模块的查找路径
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_module_init(config-&amp;gt;module_path);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 初始化定时器相关
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_timer_init();
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 初始化socket相关
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_socket_init();
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // profile是否打开
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_profile_enable(config-&amp;gt;profile);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 初始化logger相关服务
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct skynet_context *ctx = skynet_context_new(config-&amp;gt;logservice, config-&amp;gt;logger);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (ctx == NULL) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> fprintf(stderr, &amp;#34;Can&amp;#39;t launch %s service\n&amp;#34;, config-&amp;gt;logservice);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> exit(1);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_handle_namehandle(skynet_context_handle(ctx), &amp;#34;logger&amp;#34;);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 启动config-&amp;gt;bootstrap 所配置的服务
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> bootstrap(ctx, config-&amp;gt;bootstrap);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 启动线程
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> start(config-&amp;gt;thread);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // harbor_exit may call socket send, so it should exit before socket_free
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_harbor_exit();
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_socket_free();
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (config-&amp;gt;daemon) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> daemon_exit(config-&amp;gt;daemon);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这段代码主要就是初始化skynet的组件，然后启动logger、定时器等相关服务，然后调用bootstrap 和 start&lt;/p>
+&lt;h2 id="bootstrap">bootstrap&lt;/h2>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="k">static&lt;/span> &lt;span class="n">void&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">bootstrap&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">logger&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">cmdline&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">sz&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">strlen&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">cmdline&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">char&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">sz&lt;/span>&lt;span class="o">+&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">];&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">char&lt;/span> &lt;span class="n">args&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">sz&lt;/span>&lt;span class="o">+&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">];&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">arg_pos&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">sscanf&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">cmdline&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">arg_pos&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">strlen&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">arg_pos&lt;/span> &lt;span class="o">&amp;lt;&lt;/span> &lt;span class="n">sz&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">while&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">cmdline&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">arg_pos&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="s1">&amp;#39; &amp;#39;&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">arg_pos&lt;/span>&lt;span class="o">++&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">strncpy&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">args&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">cmdline&lt;/span> &lt;span class="o">+&lt;/span> &lt;span class="n">arg_pos&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">sz&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span> &lt;span class="k">else&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">args&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">]&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="s1">&amp;#39;&lt;/span>&lt;span class="se">\0&lt;/span>&lt;span class="s1">&amp;#39;&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">ctx&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_context_new&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">args&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_error&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">NULL&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;Bootstrap error : &lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="se">\n&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">cmdline&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_context_dispatchall&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">logger&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">exit&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="mi">1&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>bootstrap 主要就是根据config-&amp;gt;bootstrap配置来启动一个新的服务，在默认配置下一般都是snlua bootstrap&lt;/p>
+&lt;h2 id="start">start&lt;/h2>
+&lt;p>start函数主要是启动所有对应个数的线程，具体代码如下&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;span class="lnt">45
+&lt;/span>&lt;span class="lnt">46
+&lt;/span>&lt;span class="lnt">47
+&lt;/span>&lt;span class="lnt">48
+&lt;/span>&lt;span class="lnt">49
+&lt;/span>&lt;span class="lnt">50
+&lt;/span>&lt;span class="lnt">51
+&lt;/span>&lt;span class="lnt">52
+&lt;/span>&lt;span class="lnt">53
+&lt;/span>&lt;span class="lnt">54
+&lt;/span>&lt;span class="lnt">55
+&lt;/span>&lt;span class="lnt">56
+&lt;/span>&lt;span class="lnt">57
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">static void
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">start(int thread) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pthread_t pid[thread+3]; //额外多3个线程
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct monitor *m = skynet_malloc(sizeof(*m));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> memset(m, 0, sizeof(*m));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> m-&amp;gt;count = thread;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> m-&amp;gt;sleep = 0;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> //给每个线程都分配一个skynet_monitor
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> m-&amp;gt;m = skynet_malloc(thread * sizeof(struct skynet_monitor *));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int i;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i=0;i&amp;lt;thread;i++) { // 这个循环稍微有一点疑问，要么应该是i&amp;lt;thread+3 要么应该i从3开始，或者是我没理解正确理解
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> m-&amp;gt;m[i] = skynet_monitor_new();
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 初始化monitor的锁和条件变量
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (pthread_mutex_init(&amp;amp;m-&amp;gt;mutex, NULL)) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> fprintf(stderr, &amp;#34;Init mutex error&amp;#34;);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> exit(1);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (pthread_cond_init(&amp;amp;m-&amp;gt;cond, NULL)) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> fprintf(stderr, &amp;#34;Init cond error&amp;#34;);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> exit(1);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 额外的三个线程用于定时器、监控、socket
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> create_thread(&amp;amp;pid[0], thread_monitor, m);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> create_thread(&amp;amp;pid[1], thread_timer, m);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> create_thread(&amp;amp;pid[2], thread_socket, m);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> static int weight[] = {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> -1, -1, -1, -1, 0, 0, 0, 0,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> 1, 1, 1, 1, 1, 1, 1, 1,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> 2, 2, 2, 2, 2, 2, 2, 2,
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> 3, 3, 3, 3, 3, 3, 3, 3, };
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct worker_parm wp[thread];
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 给线程分配权重，并执行thread_worker
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i=0;i&amp;lt;thread;i++) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> wp[i].m = m;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> wp[i].id = i;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (i &amp;lt; sizeof(weight)/sizeof(weight[0])) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> wp[i].weight= weight[i];
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> } else {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> wp[i].weight = 0;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> create_thread(&amp;amp;pid[i+3], thread_worker, &amp;amp;wp[i]);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> //主线程等待其他线程结束
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i=0;i&amp;lt;thread+3;i++) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pthread_join(pid[i], NULL);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> free_monitor(m);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>主线程会额外启动三个线程，分别用于定时器、监控、socket， 在启动完毕所有线程之后，会阻塞等待所有线程的退出。对于每一个线程来说，还会再weight中有对应的权重，权重的作用先不探究。&lt;/p></description></item><item><title>Skynet源码阅读笔记(三)-SkynetetHandle</title><link>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%B8%89-skynetethandle/</link><pubDate>Tue, 21 Nov 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%B8%89-skynetethandle/</guid><description>&lt;img src="https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%B8%89-skynetethandle/skynet.jpg" alt="Featured image of post Skynet源码阅读笔记(三)-SkynetetHandle" />&lt;h1 id="skynet源码阅读笔记-skynetethandle">Skynet源码阅读笔记-SkynetetHandle&lt;/h1>
+&lt;p>在一个skyent进程中，handle的作用是用来通过它查找对应注册的ctx。&lt;/p>
+&lt;p>e而在 skynet_context_new 创建一个新的ctx的时候， 会通过 skynet_handle_register 来获取 ctx 对应的 handle。下面看看具体是怎么玩的。&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">skynet_context_new&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">param&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">handle&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">handle&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_handle_register&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="handle_storage">handle_storage&lt;/h2>
+&lt;p>先看一下 handle_storage 这个结构&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">struct handle_name {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> char * name;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint32_t handle;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">};
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">struct handle_storage {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct rwlock lock; // 读写锁
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint32_t harbor; // 本skynet节点的harbor
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint32_t handle_index; // 下一个handle 插入时查找的位置
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int slot_size; // slot 的长度
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct skynet_context ** slot; // skynet_context 数组
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int name_cap; // 当前数组的长度
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int name_count; // 当前使用个数
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct handle_name *name; // 名字映射handle的数组
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">};
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">static struct handle_storage *H = NULL;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>handle_storage结构很简单，就是一个 skynet_context 的数组，只是因为它是一个全局的对象，所以需要一个读写锁来控制访问。&lt;/p>
+&lt;h2 id="skynet_handle_register">skynet_handle_register&lt;/h2>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;span class="lnt">45
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">uint32_t
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_handle_register(struct skynet_context *ctx) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct handle_storage *s = H;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> rwlock_wlock(&amp;amp;s-&amp;gt;lock);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (;;) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int i;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint32_t handle = s-&amp;gt;handle_index;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 从handle_index 位置开始找一个可以插入的位置
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i=0;i&amp;lt;s-&amp;gt;slot_size;i++,handle++) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (handle &amp;gt; HANDLE_MASK) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 0 is reserved
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> handle = 1;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int hash = handle &amp;amp; (s-&amp;gt;slot_size-1);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (s-&amp;gt;slot[hash] == NULL) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 找到空位就插入返回
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;slot[hash] = ctx;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;handle_index = handle + 1;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> rwlock_wunlock(&amp;amp;s-&amp;gt;lock);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> handle |= s-&amp;gt;harbor;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return handle;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> assert((s-&amp;gt;slot_size*2 - 1) &amp;lt;= HANDLE_MASK);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 需要扩容了
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct skynet_context ** new_slot = skynet_malloc(s-&amp;gt;slot_size * 2 * sizeof(struct skynet_context *));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> memset(new_slot, 0, s-&amp;gt;slot_size * 2 * sizeof(struct skynet_context *));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i=0;i&amp;lt;s-&amp;gt;slot_size;i++) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (s-&amp;gt;slot[i]) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int hash = skynet_context_handle(s-&amp;gt;slot[i]) &amp;amp; (s-&amp;gt;slot_size * 2 - 1);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> assert(new_slot[hash] == NULL);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> new_slot[hash] = s-&amp;gt;slot[i];
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_free(s-&amp;gt;slot);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;slot = new_slot;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;slot_size *= 2;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 扩容完成后再插入一遍
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>skynet_handle_register 需要做的事情就是将 ctx 插入到一个当前空着的 slot 中。&lt;/p>
+&lt;p>因为是修改数组，所以进入函数的时候就获取写锁，这边从 handle_index 开始遍历数组，转一圈如果没找到空位就将数组扩充成原来的2倍，然后再执行一个插入。找到空位后将数组下标返回，这个数组下标就是 skynet_context 的handle。&lt;/p>
+&lt;p>稍微值得注意的是，因为返回的是下标，所以扩容的时候原来位置对应的元素还是应该一样的。&lt;/p>
+&lt;h2 id="skynet_handle_namehandle">skynet_handle_namehandle&lt;/h2>
+&lt;p>这个接口是用名字和handle进行把绑定&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="k">static&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">_insert_name&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">struct&lt;/span> &lt;span class="n">handle_storage&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">s&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">uint32_t&lt;/span> &lt;span class="n">handle&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">begin&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">end&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">s&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">name_count&lt;/span> &lt;span class="o">-&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">二分查找对应插入点&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">while&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">begin&lt;/span>&lt;span class="o">&amp;lt;=&lt;/span>&lt;span class="n">end&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">mid&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">begin&lt;/span>&lt;span class="o">+&lt;/span>&lt;span class="n">end&lt;/span>&lt;span class="p">)&lt;/span>&lt;span class="o">/&lt;/span>&lt;span class="mi">2&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">handle_name&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">n&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">s&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">mid&lt;/span>&lt;span class="p">];&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">c&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">strcmp&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">n&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">c&lt;/span>&lt;span class="o">==&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">c&lt;/span>&lt;span class="o">&amp;lt;&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">begin&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">mid&lt;/span> &lt;span class="o">+&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span> &lt;span class="k">else&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">end&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">mid&lt;/span> &lt;span class="o">-&lt;/span> &lt;span class="mi">1&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">result&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_strdup&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">_insert_name_before&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">s&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">result&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">handle&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">begin&lt;/span>&lt;span class="p">);&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">真正插入的行为执行点&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">result&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">skynet_handle_namehandle&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">uint32_t&lt;/span> &lt;span class="n">handle&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">rwlock_wlock&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">H&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">lock&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">ret&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">_insert_name&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">H&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">handle&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">rwlock_wunlock&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">H&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">lock&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">ret&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>在 _insert_name 中可以很明显的看出来， handle_storage 的 name 数组是一个有序的数组，插入的时候通过二分来找到插入的位置，然后调用 _insert_name_before 完成插入， _insert_name_before 中包含了对该数组的扩容以及元素移动等行为。&lt;/p>
+&lt;h2 id="skynet_handle_retire">skynet_handle_retire&lt;/h2>
+&lt;p>看一下删除操作&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">int
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_handle_retire(uint32_t handle) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int ret = 0;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct handle_storage *s = H;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> rwlock_wlock(&amp;amp;s-&amp;gt;lock);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint32_t hash = handle &amp;amp; (s-&amp;gt;slot_size-1);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct skynet_context * ctx = s-&amp;gt;slot[hash];
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (ctx != NULL &amp;amp;&amp;amp; skynet_context_handle(ctx) == handle) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;slot[hash] = NULL;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ret = 1;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int i;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int j=0, n=s-&amp;gt;name_count;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 开始删除name中的对应关系
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i=0; i&amp;lt;n; ++i) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (s-&amp;gt;name[i].handle == handle) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_free(s-&amp;gt;name[i].name);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> continue;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> } else if (i!=j) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;name[j] = s-&amp;gt;name[i];
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ++j;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;name_count = j;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> } else {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ctx = NULL;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> rwlock_wunlock(&amp;amp;s-&amp;gt;lock);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (ctx) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // release ctx may call skynet_handle_* , so wunlock first.
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_context_release(ctx);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ret;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>因为handle 本身就是数组下标，所以对于删除 slot 来说很简单，相对麻烦的事情是删name里面的对应，需要遍历和移动整个数组。&lt;/p>
+&lt;h2 id="skynet_handle_init">skynet_handle_init&lt;/h2>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">void
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_handle_init(int harbor) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> assert(H==NULL);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct handle_storage * s = skynet_malloc(sizeof(*H));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;slot_size = DEFAULT_SLOT_SIZE;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;slot = skynet_malloc(s-&amp;gt;slot_size * sizeof(struct skynet_context *));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> memset(s-&amp;gt;slot, 0, s-&amp;gt;slot_size * sizeof(struct skynet_context *));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> rwlock_init(&amp;amp;s-&amp;gt;lock);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // reserve 0 for system
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;harbor = (uint32_t) (harbor &amp;amp; 0xff) &amp;lt;&amp;lt; HANDLE_REMOTE_SHIFT;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;handle_index = 1;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;name_cap = 2;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;name_count = 0;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> s-&amp;gt;name = skynet_malloc(s-&amp;gt;name_cap * sizeof(struct handle_name));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> H = s;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // Don&amp;#39;t need to free H
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>整个结构初始化的行为 在 skynet_start 的时候调用 skynet_handle_init，这边简单的为几个数组长度进行了初始化。稍微有点点疑惑的是 特别注释了一个 不用free H。 那H的内存什么时候释放呢？&lt;/p></description></item><item><title>Skynet源码阅读笔记(二)-SkynetModule</title><link>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%BA%8C-skynetmodule/</link><pubDate>Tue, 21 Nov 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%BA%8C-skynetmodule/</guid><description>&lt;img src="https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%BA%8C-skynetmodule/skynet.jpg" alt="Featured image of post Skynet源码阅读笔记(二)-SkynetModule" />&lt;h1 id="skynet源码阅读笔记-skynetmodule">Skynet源码阅读笔记-SkynetModule&lt;/h1>
+&lt;p>skynet的服务可以认为是 SkynetModule 的实例，skynet本身自带了4个类型的服务，gate、logger、snlua、 harbor。 自带的这几个服务位于 service-src下。&lt;/p>
+&lt;p>承接上文，logger 通过 skynet_context_new 进行创建，在 skynet_context_new 中可以看到对 skynet-module 的引用。&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">skynet_context_new&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">param&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">根据名字来获取一个&lt;/span>&lt;span class="n">module&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_module&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">mod&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_module_query&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">printf&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="s2">&amp;#34;in skynet_context_new &lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="s2"> &lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="se">\n&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">param&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">mod&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">创建出&lt;/span>&lt;span class="n">module的实例&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">inst&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_module_instance_create&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">mod&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">inst&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">创建&lt;/span>&lt;span class="n">Ctx&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">ctx&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_malloc&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">sizeof&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">));&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">CHECKCALLING_INIT&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">mod&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">mod&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">instance&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">inst&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">设置其他&lt;/span>&lt;span class="n">cxt的变量初始值&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">.......&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">CHECKCALLING_BEGIN&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="n">mod&lt;/span> &lt;span class="err">初始化&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">r&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_module_instance_init&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">mod&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">inst&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">ctx&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">param&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">CHECKCALLING_END&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>skynet_context_new 本身是为了创建 skynet_context， 但可以看到 skynet_context 中加载对应 skynet_module , 并创建了对应的实例， 下面就具体看看怎么实现的。&lt;/p>
+&lt;h2 id="skynet_module-基本机构">skynet_module 基本机构&lt;/h2>
+&lt;p>先看看skynet_module的结构&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">typedef&lt;/span> &lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="n">skynet_dl_create&lt;/span>&lt;span class="p">)(&lt;/span>&lt;span class="n">void&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">typedef&lt;/span> &lt;span class="ne">int&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="n">skynet_dl_init&lt;/span>&lt;span class="p">)(&lt;/span>&lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">inst&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">parm&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">typedef&lt;/span> &lt;span class="n">void&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="n">skynet_dl_release&lt;/span>&lt;span class="p">)(&lt;/span>&lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">inst&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">typedef&lt;/span> &lt;span class="n">void&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="n">skynet_dl_signal&lt;/span>&lt;span class="p">)(&lt;/span>&lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">inst&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="ne">int&lt;/span> &lt;span class="k">signal&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_module&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">名字&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">module&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="n">module的地址&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_dl_create&lt;/span> &lt;span class="n">create&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">创建&lt;/span>&lt;span class="n">module实例执行的函数&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_dl_init&lt;/span> &lt;span class="n">init&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">初始化&lt;/span>&lt;span class="n">module执行的函数&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_dl_release&lt;/span> &lt;span class="n">release&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">释放&lt;/span>&lt;span class="n">module执行函数&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_dl_signal&lt;/span> &lt;span class="k">signal&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="n">module信号执行函数&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">};&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>对于skynet来说，一个module相当于有一个名字以及对应的4个需要执行的函数&lt;/p>
+&lt;p>在skynet_context_new中有一个skynet_module_query，这个函数会将module导入进来&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">struct&lt;/span> &lt;span class="n">modules&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">count&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">spinlock&lt;/span> &lt;span class="n">lock&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">path&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_module&lt;/span> &lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">MAX_MODULE_TYPE&lt;/span>&lt;span class="p">];&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">};&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>导入进来的 skynet_module 会被保存在 modules 的数组中，MAX_MODULE_TYPE 默认是32.&lt;/p>
+&lt;h3 id="skynet_module_query-导入过程">skynet_module_query 导入过程&lt;/h3>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="o">//&lt;/span> &lt;span class="err">查找一下当前的&lt;/span>&lt;span class="n">M中释放已经存在了对应的module&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="k">static&lt;/span> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_module&lt;/span> &lt;span class="o">*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">_query&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">i&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">for&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="o">=&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="o">&amp;lt;&lt;/span>&lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">count&lt;/span>&lt;span class="p">;&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="o">++&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">strcmp&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">)&lt;/span>&lt;span class="o">==&lt;/span>&lt;span class="mi">0&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">i&lt;/span>&lt;span class="p">];&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_module&lt;/span> &lt;span class="o">*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">skynet_module_query&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span>&lt;span class="err">查找一下当前的&lt;/span>&lt;span class="n">M中释放已经存在了对应的module&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_module&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">result&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">_query&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">result&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">result&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span>&lt;span class="err">没有的话就需要加锁导入&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">SPIN_LOCK&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">M&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">result&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">_query&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="n">double&lt;/span> &lt;span class="n">check&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">result&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="n">NULL&lt;/span> &lt;span class="o">&amp;amp;&amp;amp;&lt;/span> &lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">count&lt;/span> &lt;span class="o">&amp;lt;&lt;/span> &lt;span class="n">MAX_MODULE_TYPE&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">index&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">count&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">dl&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">_try_open&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">M&lt;/span>&lt;span class="p">,&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">尝试导入对应名字的&lt;/span>&lt;span class="n">so&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">dl&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">index&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">name&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">index&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">module&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">dl&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">open_sym&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">index&lt;/span>&lt;span class="p">])&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">将对应的&lt;/span>&lt;span class="mi">4&lt;/span>&lt;span class="err">个函数进行赋值&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">index&lt;/span>&lt;span class="p">]&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">name&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_strdup&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">count&lt;/span> &lt;span class="o">++&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">result&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">M&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">m&lt;/span>&lt;span class="p">[&lt;/span>&lt;span class="n">index&lt;/span>&lt;span class="p">];&lt;/span> &lt;span class="o">//&lt;/span>&lt;span class="err">完成后返回导入的&lt;/span>&lt;span class="n">module&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">SPIN_UNLOCK&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">M&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">result&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>skynet_module_query 执行的行为很简单, 如果当前缓存内不存在，就加锁导入进行导入，导入时通过_try_open进行的，导入完成后需要对skynet_module内的所有变量进行赋值&lt;/p>
+&lt;p>open_sym 是对传入的skynet_module的4个函数进行赋值，里面是使用字符串拼接的方式将module名字和函数名字拼在一起后通过dlsym的方式找到对应的函数&lt;/p>
+&lt;p>_try_open 实际上是dlopen的包装，在给定的搜索路径内搜索对应的so文件，然后尝试用dlopen打开。&lt;/p>
+&lt;p>skynet_module.c 内的其他接口就是对结构体内的保存的4个函数地址的封装&lt;/p>
+&lt;h2 id="小结">小结&lt;/h2>
+&lt;p>skynet_module 这个结构本身就是对so的一个包装，如果一个so需要通过这种方式加载到skynet内当作服务的话，则需要实现对应的4个方法。&lt;/p></description></item><item><title>Skynet源码阅读笔记(五)-skynet_context</title><link>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%BA%94-skynet_context/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%BA%94-skynet_context/</guid><description>&lt;img src="https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E4%BA%94-skynet_context/skynet.jpg" alt="Featured image of post Skynet源码阅读笔记(五)-skynet_context" />&lt;h1 id="skynet源码阅读笔记-skynet_context">Skynet源码阅读笔记-skynet_context&lt;/h1>
+&lt;h2 id="skynet_context">skynet_context&lt;/h2>
+&lt;p>在Skynet中，服务是由skynetContext来定义的，服务拥有自己的module，自己的messageQueue以及自己的其他数据结构。&lt;/p>
+&lt;p>module、messageQueue、handle的概念在之前的文章中已经分析过了，现在就可以开始分析skynet_context了&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">struct skynet_context {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> void * instance; // mod 实例
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct skynet_module * mod; // module
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> void * cb_ud; // 回调函数的data
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_cb cb; // 回调函数
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct message_queue *queue; // 消息队列
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ATOM_POINTER logfile; // 日志文件的指针（原子指针）
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint64_t cpu_cost; // in microsec CPU运行时间
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint64_t cpu_start; // in microsec
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> char result[32]; // 用来保存执行CMD命令的结果
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint32_t handle; // skynet_context 在全局映射的handle
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int session_id; //
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ATOM_INT ref; // 引用计数
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int message_count; // 受到过的消息总数
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> bool init; // 是否初始化
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> bool endless; // 是否死循环
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> bool profile; // 是否开启了profile
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> CHECKCALLING_DECL
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">};
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>在分析消息队列的时候，有说到全局的消息队列会不断dispatch消息到 skynet_context 的私有消息队列里。而work线程会从 skynet_context 的私有队列里不断消费数据。这边可以更详细的分析一下。&lt;/p>
+&lt;h2 id="初始化skynetcontext">初始化skynetContext&lt;/h2>
+&lt;p>初始化 skynet_context_new 是通过 skynet_context_new 来进行的，这个函数在分析module、message_queue的时候已经有分析过了，这边完整的看一下&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;span class="lnt">33
+&lt;/span>&lt;span class="lnt">34
+&lt;/span>&lt;span class="lnt">35
+&lt;/span>&lt;span class="lnt">36
+&lt;/span>&lt;span class="lnt">37
+&lt;/span>&lt;span class="lnt">38
+&lt;/span>&lt;span class="lnt">39
+&lt;/span>&lt;span class="lnt">40
+&lt;/span>&lt;span class="lnt">41
+&lt;/span>&lt;span class="lnt">42
+&lt;/span>&lt;span class="lnt">43
+&lt;/span>&lt;span class="lnt">44
+&lt;/span>&lt;span class="lnt">45
+&lt;/span>&lt;span class="lnt">46
+&lt;/span>&lt;span class="lnt">47
+&lt;/span>&lt;span class="lnt">48
+&lt;/span>&lt;span class="lnt">49
+&lt;/span>&lt;span class="lnt">50
+&lt;/span>&lt;span class="lnt">51
+&lt;/span>&lt;span class="lnt">52
+&lt;/span>&lt;span class="lnt">53
+&lt;/span>&lt;span class="lnt">54
+&lt;/span>&lt;span class="lnt">55
+&lt;/span>&lt;span class="lnt">56
+&lt;/span>&lt;span class="lnt">57
+&lt;/span>&lt;span class="lnt">58
+&lt;/span>&lt;span class="lnt">59
+&lt;/span>&lt;span class="lnt">60
+&lt;/span>&lt;span class="lnt">61
+&lt;/span>&lt;span class="lnt">62
+&lt;/span>&lt;span class="lnt">63
+&lt;/span>&lt;span class="lnt">64
+&lt;/span>&lt;span class="lnt">65
+&lt;/span>&lt;span class="lnt">66
+&lt;/span>&lt;span class="lnt">67
+&lt;/span>&lt;span class="lnt">68
+&lt;/span>&lt;span class="lnt">69
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">skynet_context_new&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">param&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">加载&lt;/span>&lt;span class="n">module&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_module&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">mod&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_module_query&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">mod&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">创建&lt;/span>&lt;span class="n">module实例&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">void&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">inst&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_module_instance_create&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">mod&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">inst&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">ctx&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_malloc&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">sizeof&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="o">*&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">));&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">CHECKCALLING_INIT&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">给&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="err">的所有变量赋初始值&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">mod&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">mod&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">instance&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">inst&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">将&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="err">的引用计数设置为&lt;/span>&lt;span class="mi">2&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ATOM_INIT&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">ref&lt;/span> &lt;span class="p">,&lt;/span> &lt;span class="mi">2&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">cb&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">cb_ud&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">session_id&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">初始化&lt;/span>&lt;span class="n">logfile&lt;/span> &lt;span class="err">原子指针&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ATOM_INIT&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">logfile&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">uintptr_t&lt;/span>&lt;span class="p">)&lt;/span>&lt;span class="n">NULL&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">init&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="bp">false&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">endless&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="bp">false&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">cpu_cost&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">cpu_start&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">message_count&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">profile&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">G_NODE&lt;/span>&lt;span class="o">.&lt;/span>&lt;span class="n">profile&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">初始化&lt;/span>&lt;span class="n">handle&lt;/span> &lt;span class="err">和&lt;/span> &lt;span class="n">message&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">handle&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">handle&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_handle_register&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">message_queue&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">queue&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">queue&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_mq_create&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">handle&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">context_inc&lt;/span>&lt;span class="p">();&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">执行&lt;/span>&lt;span class="n">module的初始化&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">CHECKCALLING_BEGIN&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">r&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_module_instance_init&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">mod&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">inst&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">ctx&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">param&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">CHECKCALLING_END&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">)&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">r&lt;/span> &lt;span class="o">==&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">初始化成功的处理&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">这边会减少初始化的引用计数&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">ret&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_context_release&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">ret&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">init&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="bp">true&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">将当前&lt;/span>&lt;span class="n">queue&lt;/span> &lt;span class="err">塞入到&lt;/span>&lt;span class="n">global&lt;/span> &lt;span class="n">mq中&lt;/span>&lt;span class="err">，等待&lt;/span>&lt;span class="n">work线程处理&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_globalmq_push&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">queue&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">if&lt;/span> &lt;span class="p">(&lt;/span>&lt;span class="n">ret&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_error&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ret&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;LAUNCH &lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="s2"> &lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">param&lt;/span> &lt;span class="err">?&lt;/span> &lt;span class="n">param&lt;/span> &lt;span class="p">:&lt;/span> &lt;span class="s2">&amp;#34;&amp;#34;&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">ret&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span> &lt;span class="k">else&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">//&lt;/span> &lt;span class="err">初始化失败就释放&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_error&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="s2">&amp;#34;FAILED launch &lt;/span>&lt;span class="si">%s&lt;/span>&lt;span class="s2">&amp;#34;&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">uint32_t&lt;/span> &lt;span class="n">handle&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">handle&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_context_release&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_handle_retire&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">handle&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">drop_t&lt;/span> &lt;span class="n">d&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="p">{&lt;/span> &lt;span class="n">handle&lt;/span> &lt;span class="p">};&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">skynet_mq_release&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">queue&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="n">drop_message&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="o">&amp;amp;&lt;/span>&lt;span class="n">d&lt;/span>&lt;span class="p">);&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="k">return&lt;/span> &lt;span class="n">NULL&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>初始化流程中主要就是加载并实例化module，并创建message_queue提供给work进行处理。&lt;/p>
+&lt;p>在初始化的时候，可以看到引用计数被设置成2，这边初始化为2的原因我猜测是因为&lt;/p>
+&lt;ol>
+&lt;li>初始化流程算引用一次，所以初始化结束会减少一次 可以看到调用了skynet_context_release；&lt;/li>
+&lt;li>另一次是因为注册到handle中， 可以看到skynet_handle_register并不会增加引用结束，但在执行 handle_exit的时候，会调用到 skynet_handle_retire，这里面会对ctx的引用技术减少一。&lt;/li>
+&lt;/ol>
+&lt;p>减少引用计数的调用如下&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;span class="lnt">8
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">struct skynet_context *
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_context_release(struct skynet_context *ctx) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (ATOM_FDEC(&amp;amp;ctx-&amp;gt;ref) == 1) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> delete_context(ctx);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return NULL;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return ctx;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>ATOM_FDEC 会将ref减少1， 并返回调用前的值。所以当引用计数为1进来的时候，就会删掉对应的 skynet_context&lt;/p>
+&lt;h2 id="回调函数的注册与回调时机">回调函数的注册与回调时机&lt;/h2>
+&lt;p>每个服务都会有自己的回调函数，这个回调函数的作用就是在收到message的时候，调用回来函数来进行处理。&lt;/p>
+&lt;h3 id="注册时机">注册时机&lt;/h3>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">void
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_callback(struct skynet_context * context, void *ud, skynet_cb cb) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> context-&amp;gt;cb = cb;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> context-&amp;gt;cb_ud = ud;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>每个服务通过 skynet_callback 来注册自己的回调，调用这个的时机都是在每个服务内部自己决定。
+在skynet中的自带的几个服务，都是在init的时候调用 skynet_callback 来注册回调&lt;/p>
+&lt;h3 id="回调时机">回调时机&lt;/h3>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">struct message_queue *
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q, int weight) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i=0;i&amp;lt;n;i++) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 如果没有回调函数，则直接释放消息
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (ctx-&amp;gt;cb == NULL) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_free(msg.data);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> } else {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> dispatch_message(ctx, &amp;amp;msg);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>skynet_context_message_dispatch 这个函数是在work线程执行中回调用的函数，该函数会在ctx存在要处理的消息时调用&lt;/p>
+&lt;p>dispatch_message 具体函数如下&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">static void
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">dispatch_message(struct skynet_context *ctx, struct skynet_message *msg) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> assert(ctx-&amp;gt;init);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> CHECKCALLING_BEGIN(ctx)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 设置当前线程正在跑的handle
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> pthread_setspecific(G_NODE.handle_key, (void *)(uintptr_t)(ctx-&amp;gt;handle));
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int type = msg-&amp;gt;sz &amp;gt;&amp;gt; MESSAGE_TYPE_SHIFT;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> size_t sz = msg-&amp;gt;sz &amp;amp; MESSAGE_TYPE_MASK;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 打个收到消息的日志
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> FILE *f = (FILE *)ATOM_LOAD(&amp;amp;ctx-&amp;gt;logfile);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (f) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_log_output(f, msg-&amp;gt;source, type, msg-&amp;gt;session, msg-&amp;gt;data, sz);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ++ctx-&amp;gt;message_count;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int reserve_msg;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (ctx-&amp;gt;profile) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 如果开启了profile，则会记录调用前后的CPU时间差
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ctx-&amp;gt;cpu_start = skynet_thread_time();
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> reserve_msg = ctx-&amp;gt;cb(ctx, ctx-&amp;gt;cb_ud, type, msg-&amp;gt;session, msg-&amp;gt;source, msg-&amp;gt;data, sz);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint64_t cost_time = skynet_thread_time() - ctx-&amp;gt;cpu_start;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ctx-&amp;gt;cpu_cost += cost_time;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> } else {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> reserve_msg = ctx-&amp;gt;cb(ctx, ctx-&amp;gt;cb_ud, type, msg-&amp;gt;session, msg-&amp;gt;source, msg-&amp;gt;data, sz);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (!reserve_msg) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_free(msg-&amp;gt;data);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> CHECKCALLING_END(ctx)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>dispatch_message 函数实际上就是调用了ctx函数的回调函数，只是在调用前后额外设置了环境相关的变量。&lt;/p>
+&lt;h2 id="小结">小结&lt;/h2>
+&lt;p>skynet_context 的重要结构到这边就分析完了，skynet_context的作用主要就是给modules提供一个运行环境，拥有自己独立的数据结构，并提供接口给module让其能够用handle或者名字的形式给其他skynet_context 发送消息。&lt;/p></description></item><item><title>Skynet源码阅读笔记(四)-message_queue</title><link>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%9B%9B-message_queue/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%9B%9B-message_queue/</guid><description>&lt;img src="https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%9B%9B-message_queue/skynet.jpg" alt="Featured image of post Skynet源码阅读笔记(四)-message_queue" />&lt;h1 id="skynet源码阅读笔记-message">Skynet源码阅读笔记-message&lt;/h1>
+&lt;h2 id="skynet_message">skynet_message&lt;/h2>
+&lt;p>在skynet中，两个服务之间是通过message传递消息来触发事件的&lt;/p>
+&lt;p>skynet_message 结构如下&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">struct skynet_message {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint32_t source; // 消息源的handle
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int session; // 消息的session Id
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> void * data; // 消息的内容
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> size_t sz; // 消息的长度 和 类型，
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">};
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">// type is encoding in skynet_message.sz high 8bit
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define MESSAGE_TYPE_MASK (SIZE_MAX &amp;gt;&amp;gt; 8)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">#define MESSAGE_TYPE_SHIFT ((sizeof(size_t)-1) * 8)
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="message_queue">message_queue&lt;/h2>
+&lt;p>而保存 skynet_message 的结构则是 message_queue&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">struct&lt;/span> &lt;span class="n">message_queue&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">spinlock&lt;/span> &lt;span class="n">lock&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">自旋锁&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">uint32_t&lt;/span> &lt;span class="n">handle&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">对应的&lt;/span>&lt;span class="n">handle&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">cap&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">当前消息队列容量&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">head&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">消息队列头&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">tail&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">消息队列尾&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">release&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span>&lt;span class="err">是否被释放&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">in_global&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">标记是否在全局队列中&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">overload&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">是否超载&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="ne">int&lt;/span> &lt;span class="n">overload_threshold&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span>&lt;span class="err">超载阈值&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_message&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">queue&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">实际的消息对了&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">message_queue&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">next&lt;/span>&lt;span class="p">;&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">下一个消息队列&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>message_queue 是一个简单的结构并不复杂的消息队列，本质上就是 由一个 循环数组 + 自旋锁构成。&lt;/p>
+&lt;p>操作 message_queue 的代码都在 skyenet_mq.c 中。本质上和操作普通队列没什么特别大区别，只是每次操作前都通过自旋锁来锁住操作。当消息通过 skynet_mq_push 塞进队列的时候，如果队列满了的话就会变成原来的2倍。&lt;/p>
+&lt;p>message_queue 中的handle 说明了这个 message_queue 绑定上的对应的 skynet_context。在skynet_context_new中可以看到对应的代码&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;span class="lnt">8
+&lt;/span>&lt;span class="lnt">9
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-gdscript3" data-lang="gdscript3">&lt;span class="line">&lt;span class="cl">&lt;span class="n">struct&lt;/span> &lt;span class="n">skynet_context&lt;/span> &lt;span class="o">*&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="n">skynet_context_new&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">name&lt;/span>&lt;span class="p">,&lt;/span> &lt;span class="k">const&lt;/span> &lt;span class="n">char&lt;/span> &lt;span class="o">*&lt;/span>&lt;span class="n">param&lt;/span>&lt;span class="p">)&lt;/span> &lt;span class="p">{&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">handle&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="mi">0&lt;/span>&lt;span class="p">;&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">handle&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_handle_register&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="p">);&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">这一步就是笔记三中的部分&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="n">struct&lt;/span> &lt;span class="n">message_queue&lt;/span> &lt;span class="o">*&lt;/span> &lt;span class="n">queue&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">queue&lt;/span> &lt;span class="o">=&lt;/span> &lt;span class="n">skynet_mq_create&lt;/span>&lt;span class="p">(&lt;/span>&lt;span class="n">ctx&lt;/span>&lt;span class="o">-&amp;gt;&lt;/span>&lt;span class="n">handle&lt;/span>&lt;span class="p">);&lt;/span> &lt;span class="o">//&lt;/span> &lt;span class="err">获取&lt;/span>&lt;span class="n">handle后&lt;/span>&lt;span class="err">，就创建&lt;/span> &lt;span class="n">message_queue&lt;/span>&lt;span class="err">，&lt;/span> &lt;span class="err">并绑定上对应的&lt;/span>&lt;span class="n">handle&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> &lt;span class="o">...&lt;/span>
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">&lt;span class="p">}&lt;/span>
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="global_queue">global_queue&lt;/h2>
+&lt;p>mesaage_queue 在接收到消息后, 会将自己放入到global_queue 这个结构中&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">struct global_queue {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct message_queue *head; // mesaage_queue 的链表头
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct message_queue *tail; // mesaage_queue 的链表尾
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct spinlock lock; // 自旋锁
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">};
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">static struct global_queue *Q = NULL;
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="数据的消费以及产生">数据的消费以及产生&lt;/h2>
+&lt;p>这个结构是一个全局变量，它管理着目前有消息的消息队列。在 skynet_context_message_dispatch 函数中，message_queue的message 会被消费&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;span class="lnt">24
+&lt;/span>&lt;span class="lnt">25
+&lt;/span>&lt;span class="lnt">26
+&lt;/span>&lt;span class="lnt">27
+&lt;/span>&lt;span class="lnt">28
+&lt;/span>&lt;span class="lnt">29
+&lt;/span>&lt;span class="lnt">30
+&lt;/span>&lt;span class="lnt">31
+&lt;/span>&lt;span class="lnt">32
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">struct message_queue *
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue *q, int weight) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (q == NULL) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> q = skynet_globalmq_pop(); // 获取全局消息队列的头部
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (q==NULL)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return NULL;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> uint32_t handle = skynet_mq_handle(q);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct skynet_context * ctx = skynet_handle_grab(handle); // 找到对应的 skynet_context
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> .....
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> int i,n=1;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct skynet_message msg;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> for (i=0;i&amp;lt;n;i++) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> //从队列头部获取消息
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (skynet_mq_pop(q,&amp;amp;msg)) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> .....
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (ctx-&amp;gt;cb == NULL) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_free(msg.data);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> } else {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> // 触发消息事件
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> dispatch_message(ctx, &amp;amp;msg);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> ...
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>可以看到skynet_context_message_dispatch 函数就是从全局队列拿到队列的消息列表后，在从消息列表中获取到对应消息来消费。&lt;/p>
+&lt;p>这个函数skynet_context_message_dispatch 实际上是被包装在thread_worker，在初始化的时候由多个线程一起调用，所以需要加锁。&lt;/p>
+&lt;p>而对于一个消息，它会通过下面两个接口塞入到消息队列中&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;span class="lnt">19
+&lt;/span>&lt;span class="lnt">20
+&lt;/span>&lt;span class="lnt">21
+&lt;/span>&lt;span class="lnt">22
+&lt;/span>&lt;span class="lnt">23
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">int
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_context_push(uint32_t handle, struct skynet_message *message) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct skynet_context * ctx = skynet_handle_grab(handle);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> if (ctx == NULL) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return -1;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> }
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_mq_push(ctx-&amp;gt;queue, message);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_context_release(ctx);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> return 0;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">void
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">skynet_context_send(struct skynet_context * ctx, void * msg, size_t sz, uint32_t source, int type, int session) {
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> struct skynet_message smsg;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> smsg.source = source;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> smsg.session = session;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> smsg.data = msg;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> smsg.sz = sz | (size_t)type &amp;lt;&amp;lt; MESSAGE_TYPE_SHIFT;
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> skynet_mq_push(ctx-&amp;gt;queue, &amp;amp;smsg);
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">}
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>skynet.send 最后也是调用的 skynet_context_push， messsage会在外面包装好，然后直接丢到对应的 skynet_context 的 message_queue中。&lt;/p>
+&lt;p>skynet_harbor_send 则是调用的 skynet_context_send 来把消息塞入到对应的message中。&lt;/p></description></item></channel></rss>
