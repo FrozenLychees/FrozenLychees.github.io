@@ -118,6 +118,20 @@ skynet_context_message_dispatch(struct skynet_monitor *sm, struct message_queue 
 可以看到skynet_context_message_dispatch 函数就是从全局队列拿到队列的消息列表后，在从消息列表中获取到对应消息来消费。
 
 这个函数skynet_context_message_dispatch 实际上是被包装在thread_worker，在初始化的时候由多个线程一起调用，所以需要加锁。
+```
+
+static void *
+thread_worker(void *p) {
+	....
+	while (!m->quit) {
+		q = skynet_context_message_dispatch(sm, q, weight);  --- 所有线程一起执行skynet_context_message_dispatch
+		....
+	}
+}
+```
+
+所以，所有工作线程到最后只是执行对应的服务的事件队列而已。
+
 
 
 而对于一个消息，它会通过下面两个接口塞入到消息队列中
