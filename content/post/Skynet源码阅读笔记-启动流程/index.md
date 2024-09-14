@@ -10,6 +10,8 @@ categories:
 
 # Skynet源码阅读笔记-启动流程
 
+![skynet启动流程](skynet启动流程.png)
+
 ## 主流程
 main函数在skynet_main.c中, 主函数里的流程看起来不算很长，这边全贴出来，然后分块分析
 
