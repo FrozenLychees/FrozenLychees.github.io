@@ -9,8 +9,9 @@ since = 2020
 customText = ""
 
 [dateFormat]
-published = "Aug 16, 2023"
-lastUpdated = "Aug 16, 2023 20:30 MST"
+#published = "Aug 16, 2023"
+#lastUpdated = "Aug 16, 2023 20:30 MST"
+date: {{ .Date }}
 
 [sidebar]
 emoji = "🍥"
