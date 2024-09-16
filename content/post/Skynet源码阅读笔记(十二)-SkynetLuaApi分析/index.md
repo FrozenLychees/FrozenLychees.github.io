@@ -3,7 +3,7 @@ title: Skynet源码阅读笔记(十二)-SkynetLuaApi分析
 description: 
 slug: 
 date: 2024-08-16 00:00:00+0000
-image: skynet.jpg
+image: skynet.png
 categories:
     - skynet
 ---

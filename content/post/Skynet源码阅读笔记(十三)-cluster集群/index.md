@@ -3,7 +3,7 @@ title: Skynet源码阅读笔记(十三)-cluster集群
 description: 
 slug: 
 date: 2024-09-02 00:00:00+0000
-image: skynet.jpg
+image: skynet.png
 categories:
     - skynet
 ---

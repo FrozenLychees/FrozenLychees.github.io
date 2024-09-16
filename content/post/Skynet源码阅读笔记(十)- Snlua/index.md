@@ -3,7 +3,7 @@ title: Skynet源码阅读笔记(十)- Snlua 服务
 description: 
 slug: 
 date: 2023-11-21 00:00:00+0000
-image: skynet.jpg
+image: skynet.png
 categories:
     - skynet
 ---
