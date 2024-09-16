@@ -3,7 +3,7 @@ title: Skynet源码阅读笔记(四)-message_queue
 description: 
 slug: 
 date: 2024-1-24 00:00:00+0000
-image: skynet.jpg
+image: skynet.png
 categories:
     - skynet
 ---

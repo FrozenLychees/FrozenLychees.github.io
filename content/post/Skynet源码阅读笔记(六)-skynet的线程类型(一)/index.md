@@ -3,7 +3,7 @@ title: Skynet源码阅读笔记(六)-skynet的线程类型（一）
 description: 
 slug: 
 date: 2024-1-31 00:00:00+0000
-image: skynet.jpg
+image: skynet.png
 categories:
     - skynet
 ---
