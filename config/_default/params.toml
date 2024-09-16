@@ -11,7 +11,8 @@ customText = ""
 [dateFormat]
 #published = "Aug 16, 2023"
 #lastUpdated = "Aug 16, 2023 20:30 MST"
-#date: {{ .Date }}
+published = "2006-01-02"
+lastUpdated = "2006-01-02 15:04 MST"
 
 [sidebar]
 emoji = "🍥"
