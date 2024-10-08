@@ -1,0 +1,432 @@
+<!doctype html><html lang=en-us dir=ltr><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><meta name=description content='todo 整理一下这个文章 需要在f_parser之前说明 top的结构 Lua 源码阅读笔记-Lua代码执行过程 因为脚本语言通常都是解释型语言，在执行脚本语言的时候，都需要先将代码翻译成对应虚拟机的字节码，然后虚拟机会调用一些加载的函数将字节码加载到虚拟机内执行，Lua也不例外。接下来就准备窥探一下Lua在从lua代码到虚拟机开始执行字节码的整个流程，并整理流程中遇到的比较重要的数据结构和函数，为之后深入研究Lua虚拟机做一个铺垫。\n这边探究的是5.4 的lua代码。\n整体数据结构 先来看一下整体的数据结构\n大概可以分为以下几个数据结构\nLuaStatus 是Lua的虚拟机，控制着当前代码的整个环境，持有对整个栈的引用 CallInfo 控制单个函数调用的环境，同时通过双向链表可以获取到整个调用栈的顺序。 Closure 函数闭包，分为CClosure和LClosure，其中Lua的LClosure 由Proto 和 upvales构成，upvalues是对于整个栈的其他位置的变量的引用. Proto 包含函数的字节码 和 局部变量、upvalues变量等DEBUG信息，可以认为这个就是函数编译后的静态的相关信息 整体流程 执行lua代码的流程大致如下\n在lua中整个流程大致可以分成两个子步骤\nlua代码的词法语法分析，这边的主要函数是在 luaY_parser 执行OpCode，这边主要函数是 luaV_execute 整个流程主要就是通过 luaY_parser 来产生Closure，并在 luaV_execute 中进行执行.\nf_parser 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 static void f_parser (lua_State *L, void *ud) { LClosure *cl; struct SParser *p = cast(struct SParser *, ud); int c = zgetc(p->z); /* read first character */ if (c == LUA_SIGNATURE[0]) { // 加载二进制的处理 checkmode(L, p->mode, "binary"); cl = luaU_undump(L, p->z, p->name); } else { // 加载文本文件的处理 checkmode(L, p->mode, "text"); cl = luaY_parser(L, p->z, &amp;p->buff, &amp;p->dyd, p->name, c); } lua_assert(cl->nupvalues == cl->p->sizeupvalues); luaF_initupvals(L, cl); } 这边具体不深入到 luaY_parser 的细节，这边只看 f_parser的 大致情况，可以比较明显的看出在 f_parser 中通过调用luaY_parser进行词法解析，并可以得到一个LClosure的数据结构。无论进入的是哪个分支，都可以在对应的函数中看到下面这一行调用\n'><title>Lua 源码阅读笔记-Lua代码执行过程</title>
+<link rel=canonical href=https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/><link rel=stylesheet href=/scss/style.min.0304c6baf04e01a8fe70693791cb744d56a3578a3120a8796cefc66825aa39c7.css><meta property='og:title' content="Lua 源码阅读笔记-Lua代码执行过程"><meta property='og:description' content='todo 整理一下这个文章 需要在f_parser之前说明 top的结构 Lua 源码阅读笔记-Lua代码执行过程 因为脚本语言通常都是解释型语言，在执行脚本语言的时候，都需要先将代码翻译成对应虚拟机的字节码，然后虚拟机会调用一些加载的函数将字节码加载到虚拟机内执行，Lua也不例外。接下来就准备窥探一下Lua在从lua代码到虚拟机开始执行字节码的整个流程，并整理流程中遇到的比较重要的数据结构和函数，为之后深入研究Lua虚拟机做一个铺垫。\n这边探究的是5.4 的lua代码。\n整体数据结构 先来看一下整体的数据结构\n大概可以分为以下几个数据结构\nLuaStatus 是Lua的虚拟机，控制着当前代码的整个环境，持有对整个栈的引用 CallInfo 控制单个函数调用的环境，同时通过双向链表可以获取到整个调用栈的顺序。 Closure 函数闭包，分为CClosure和LClosure，其中Lua的LClosure 由Proto 和 upvales构成，upvalues是对于整个栈的其他位置的变量的引用. Proto 包含函数的字节码 和 局部变量、upvalues变量等DEBUG信息，可以认为这个就是函数编译后的静态的相关信息 整体流程 执行lua代码的流程大致如下\n在lua中整个流程大致可以分成两个子步骤\nlua代码的词法语法分析，这边的主要函数是在 luaY_parser 执行OpCode，这边主要函数是 luaV_execute 整个流程主要就是通过 luaY_parser 来产生Closure，并在 luaV_execute 中进行执行.\nf_parser 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 static void f_parser (lua_State *L, void *ud) { LClosure *cl; struct SParser *p = cast(struct SParser *, ud); int c = zgetc(p->z); /* read first character */ if (c == LUA_SIGNATURE[0]) { // 加载二进制的处理 checkmode(L, p->mode, "binary"); cl = luaU_undump(L, p->z, p->name); } else { // 加载文本文件的处理 checkmode(L, p->mode, "text"); cl = luaY_parser(L, p->z, &amp;p->buff, &amp;p->dyd, p->name, c); } lua_assert(cl->nupvalues == cl->p->sizeupvalues); luaF_initupvals(L, cl); } 这边具体不深入到 luaY_parser 的细节，这边只看 f_parser的 大致情况，可以比较明显的看出在 f_parser 中通过调用luaY_parser进行词法解析，并可以得到一个LClosure的数据结构。无论进入的是哪个分支，都可以在对应的函数中看到下面这一行调用\n'><meta property='og:url' content='https://frozenlychees.github.io/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/'><meta property='og:site_name' content='FrozenLychees'><meta property='og:type' content='article'><meta property='article:section' content='Post'><meta property='article:published_time' content='2024-09-20T00:00:00+00:00'><meta property='article:modified_time' content='2024-09-20T00:00:00+00:00'><meta property='og:image' content='https://frozenlychees.github.io/lua.png'><meta name=twitter:title content="Lua 源码阅读笔记-Lua代码执行过程"><meta name=twitter:description content='todo 整理一下这个文章 需要在f_parser之前说明 top的结构 Lua 源码阅读笔记-Lua代码执行过程 因为脚本语言通常都是解释型语言，在执行脚本语言的时候，都需要先将代码翻译成对应虚拟机的字节码，然后虚拟机会调用一些加载的函数将字节码加载到虚拟机内执行，Lua也不例外。接下来就准备窥探一下Lua在从lua代码到虚拟机开始执行字节码的整个流程，并整理流程中遇到的比较重要的数据结构和函数，为之后深入研究Lua虚拟机做一个铺垫。\n这边探究的是5.4 的lua代码。\n整体数据结构 先来看一下整体的数据结构\n大概可以分为以下几个数据结构\nLuaStatus 是Lua的虚拟机，控制着当前代码的整个环境，持有对整个栈的引用 CallInfo 控制单个函数调用的环境，同时通过双向链表可以获取到整个调用栈的顺序。 Closure 函数闭包，分为CClosure和LClosure，其中Lua的LClosure 由Proto 和 upvales构成，upvalues是对于整个栈的其他位置的变量的引用. Proto 包含函数的字节码 和 局部变量、upvalues变量等DEBUG信息，可以认为这个就是函数编译后的静态的相关信息 整体流程 执行lua代码的流程大致如下\n在lua中整个流程大致可以分成两个子步骤\nlua代码的词法语法分析，这边的主要函数是在 luaY_parser 执行OpCode，这边主要函数是 luaV_execute 整个流程主要就是通过 luaY_parser 来产生Closure，并在 luaV_execute 中进行执行.\nf_parser 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 static void f_parser (lua_State *L, void *ud) { LClosure *cl; struct SParser *p = cast(struct SParser *, ud); int c = zgetc(p->z); /* read first character */ if (c == LUA_SIGNATURE[0]) { // 加载二进制的处理 checkmode(L, p->mode, "binary"); cl = luaU_undump(L, p->z, p->name); } else { // 加载文本文件的处理 checkmode(L, p->mode, "text"); cl = luaY_parser(L, p->z, &amp;p->buff, &amp;p->dyd, p->name, c); } lua_assert(cl->nupvalues == cl->p->sizeupvalues); luaF_initupvals(L, cl); } 这边具体不深入到 luaY_parser 的细节，这边只看 f_parser的 大致情况，可以比较明显的看出在 f_parser 中通过调用luaY_parser进行词法解析，并可以得到一个LClosure的数据结构。无论进入的是哪个分支，都可以在对应的函数中看到下面这一行调用\n'><meta name=twitter:card content="summary_large_image"><meta name=twitter:image content='https://frozenlychees.github.io/lua.png'><link rel="shortcut icon" href=/favicon.png><script async src="https://www.googletagmanager.com/gtag/js?id=G-KCSZNN6B9X"></script><script>var dnt,doNotTrack=!1;if(!1&&(dnt=navigator.doNotTrack||window.doNotTrack||navigator.msDoNotTrack,doNotTrack=dnt=="1"||dnt=="yes"),!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-KCSZNN6B9X")}</script></head><body class=article-page><script>(function(){const e="StackColorScheme";localStorage.getItem(e)||localStorage.setItem(e,"auto")})()</script><script>(function(){const t="StackColorScheme",e=localStorage.getItem(t),n=window.matchMedia("(prefers-color-scheme: dark)").matches===!0;e=="dark"||e==="auto"&&n?document.documentElement.dataset.scheme="dark":document.documentElement.dataset.scheme="light"})()</script><div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky"><button class="hamburger hamburger--spin" type=button id=toggle-menu aria-label="Toggle Menu">
+<span class=hamburger-box><span class=hamburger-inner></span></span></button><header><figure class=site-avatar><a href=/><img src=/img/forzenLychees_hu14353860160155089042.jpg width=300 height=300 class=site-logo loading=lazy alt=Avatar>
+</a><span class=emoji>🍥</span></figure><div class=site-meta><h1 class=site-name><a href=/>FrozenLychees</a></h1><h2 class=site-description>天天摸鱼身体棒</h2></div></header><ol class=menu-social><li><a href=https://github.com/FrozenLychees target=_blank title=GitHub rel=me><svg class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6.0 00-1.3-3.2 4.2 4.2.0 00-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3.0 00-6.2.0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2.0 00-.1 3.2A4.6 4.6.0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a></li><li><a href=https://twitter.com target=_blank title=Twitter rel=me><svg class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-1.265-2.783-1.335-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84.0 00.497-3.753C20.18 7.773 21.692 5.25 22 4.009z"/></svg></a></li></ol><ol class=menu id=main-menu><li><a href=/><svg class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/><path d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"/></svg>
+<span>Home</span></a></li><li><a href=/archives/><svg class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><rect x="3" y="4" width="18" height="4" rx="2"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+<span>Archives</span></a></li><li><a href=/search/><svg class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+<span>Search</span></a></li><li><a href=/links/><svg class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 14a3.5 3.5.0 005 0l4-4a3.5 3.5.0 00-5-5l-.5.5"/><path d="M14 10a3.5 3.5.0 00-5 0l-4 4a3.5 3.5.0 005 5l.5-.5"/></svg>
+<span>Links</span></a></li><li class=menu-bottom-section><ol class=menu><li id=dark-mode-toggle><svg class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="8" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<svg class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="16" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<span>Dark Mode</span></li></ol></li></ol></aside><aside class="sidebar right-sidebar sticky"><section class="widget archives"><div class=widget-icon><svg class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="11" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="13" y2="20"/></svg></div><h2 class="widget-title section-title">Table of contents</h2><div class=widget--toc><nav id=TableOfContents><ol><li><a href=#整体数据结构>整体数据结构</a></li><li><a href=#整体流程>整体流程</a><ol><li><a href=#f_parser>f_parser</a></li></ol></li><li><a href=#luav_execute>luaV_execute</a></li><li><a href=#closure中的-upvalues-这个数组是怎么生成的>closure中的 upvalues 这个数组是怎么生成的</a></li><li><a href=#使用gdb-验证>使用GDB 验证</a></li><li><a href=#小结>小结</a></li></ol></nav></div></section></aside><main class="main full-width"><article class="has-image main-article"><header class=article-header><div class=article-image><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/><img src=/lua.png loading=lazy alt="Featured image of post Lua 源码阅读笔记-Lua代码执行过程"></a></div><div class=article-details><header class=article-category><a href=/categories/lua/>Lua</a></header><div class=article-title-wrapper><h2 class=article-title><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/>Lua 源码阅读笔记-Lua代码执行过程</a></h2></div><footer class=article-time><div><svg class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M11.795 21H5a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v4"/><circle cx="18" cy="18" r="4"/><path d="M15 3v4"/><path d="M7 3v4"/><path d="M3 11h16"/><path d="M18 16.496V18l1 1"/></svg>
+<time class=article-time--published>2024-09-20</time></div><div><svg class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<time class=article-time--reading>6 minute read</time></div></footer></div></header><section class=article-content><h1 id=todo>todo</h1><ol><li>整理一下这个文章</li><li>需要在f_parser之前说明 top的结构</li></ol><h1 id=lua-源码阅读笔记-lua代码执行过程>Lua 源码阅读笔记-Lua代码执行过程</h1><p>因为脚本语言通常都是解释型语言，在执行脚本语言的时候，都需要先将代码翻译成对应虚拟机的字节码，然后虚拟机会调用一些加载的函数将字节码加载到虚拟机内执行，Lua也不例外。接下来就准备窥探一下Lua在从lua代码到虚拟机开始执行字节码的整个流程，并整理流程中遇到的比较重要的数据结构和函数，为之后深入研究Lua虚拟机做一个铺垫。</p><p>这边探究的是5.4 的lua代码。</p><h2 id=整体数据结构>整体数据结构</h2><p>先来看一下整体的数据结构</p><p><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/Lua%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B%E4%B8%AD%E7%9A%84%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84.png width=2244 height=1224 srcset="/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/Lua%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B%E4%B8%AD%E7%9A%84%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84_hu4954295132107143419.png 480w, /p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/Lua%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B%E4%B8%AD%E7%9A%84%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84_hu5100407895398563650.png 1024w" loading=lazy alt=Lua执行流程中的数据结构 class=gallery-image data-flex-grow=183 data-flex-basis=440px></p><p>大概可以分为以下几个数据结构</p><ol><li>LuaStatus 是Lua的虚拟机，控制着当前代码的整个环境，持有对整个栈的引用</li><li>CallInfo 控制单个函数调用的环境，同时通过双向链表可以获取到整个调用栈的顺序。</li><li>Closure 函数闭包，分为CClosure和LClosure，其中Lua的LClosure 由Proto 和 upvales构成，upvalues是对于整个栈的其他位置的变量的引用.</li><li>Proto 包含函数的字节码 和 局部变量、upvalues变量等DEBUG信息，可以认为这个就是函数编译后的静态的相关信息</li></ol><h2 id=整体流程>整体流程</h2><p>执行lua代码的流程大致如下</p><p><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/image.png width=652 height=193 srcset="/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/image_hu12999457345606678585.png 480w, /p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-lua%E4%BB%A3%E7%A0%81%E6%89%A7%E8%A1%8C%E8%BF%87%E7%A8%8B/image_hu571763286321797509.png 1024w" loading=lazy alt=整体流程 class=gallery-image data-flex-grow=337 data-flex-basis=810px></p><p>在lua中整个流程大致可以分成两个子步骤</p><ol><li>lua代码的词法语法分析，这边的主要函数是在 luaY_parser</li><li>执行OpCode，这边主要函数是 luaV_execute</li></ol><p>整个流程主要就是通过 luaY_parser 来产生Closure，并在 luaV_execute 中进行执行.</p><h3 id=f_parser>f_parser</h3><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>static void f_parser (lua_State *L, void *ud) {
+</span></span><span class=line><span class=cl>  LClosure *cl;
+</span></span><span class=line><span class=cl>  struct SParser *p = cast(struct SParser *, ud);
+</span></span><span class=line><span class=cl>  int c = zgetc(p-&gt;z);  /* read first character */
+</span></span><span class=line><span class=cl>  if (c == LUA_SIGNATURE[0]) {
+</span></span><span class=line><span class=cl>    // 加载二进制的处理
+</span></span><span class=line><span class=cl>    checkmode(L, p-&gt;mode, &#34;binary&#34;);
+</span></span><span class=line><span class=cl>    cl = luaU_undump(L, p-&gt;z, p-&gt;name);
+</span></span><span class=line><span class=cl>  }
+</span></span><span class=line><span class=cl>  else {
+</span></span><span class=line><span class=cl>    // 加载文本文件的处理
+</span></span><span class=line><span class=cl>    checkmode(L, p-&gt;mode, &#34;text&#34;);
+</span></span><span class=line><span class=cl>    cl = luaY_parser(L, p-&gt;z, &amp;p-&gt;buff, &amp;p-&gt;dyd, p-&gt;name, c);
+</span></span><span class=line><span class=cl>  }
+</span></span><span class=line><span class=cl>  lua_assert(cl-&gt;nupvalues == cl-&gt;p-&gt;sizeupvalues);
+</span></span><span class=line><span class=cl>  luaF_initupvals(L, cl);
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>这边具体不深入到 luaY_parser 的细节，这边只看 f_parser的 大致情况，可以比较明显的看出在 f_parser 中通过调用luaY_parser进行词法解析，并可以得到一个LClosure的数据结构。无论进入的是哪个分支，都可以在对应的函数中看到下面这一行调用</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>  setclLvalue2s(L, L-&gt;top.p, cl);
+</span></span></code></pre></td></tr></table></div></div><p>说明cl已经被放置到 L->top的位置。这个top就是当前栈的栈顶。所以在执行完整个f_parser后，栈顶就是一个Closure。这边稍微说明一下，因为这边做的是文件解析，所以到最后</p><h2 id=luav_execute>luaV_execute</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>l_sinline void ccall (lua_State *L, StkId func, int nResults, l_uint32 inc) {
+</span></span><span class=line><span class=cl>  CallInfo *ci;
+</span></span><span class=line><span class=cl>  L-&gt;nCcalls += inc; // 增加调用次数 
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  // 栈溢出判断
+</span></span><span class=line><span class=cl>  if (l_unlikely(getCcalls(L) &gt;= LUAI_MAXCCALLS)) {
+</span></span><span class=line><span class=cl>    checkstackp(L, 0, func);  /* free any use of EXTRA_STACK */
+</span></span><span class=line><span class=cl>    luaE_checkcstack(L);
+</span></span><span class=line><span class=cl>  }
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  // 调用函数前的准备
+</span></span><span class=line><span class=cl>  if ((ci = luaD_precall(L, func, nResults)) != NULL) {  /* Lua function? */
+</span></span><span class=line><span class=cl>    ci-&gt;callstatus = CIST_FRESH;  /* mark that it is a &#34;fresh&#34; execute */
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    // 执行luaV_execute，传入的是CallInfo
+</span></span><span class=line><span class=cl>    luaV_execute(L, ci);  /* call it */
+</span></span><span class=line><span class=cl>  }
+</span></span><span class=line><span class=cl>  L-&gt;nCcalls -= inc;
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>调用luaV_execute的入口是ccall，这边的func是刚刚在栈内的Closure，nResult是对应闭包的返回值。</p><p>在调用luaV_execute的时候传入的不是Closure，是CallInfo。而在 luaD_precall 这个准备函数里面可以看到CallInfo 和 Closure之间是如何联系上的</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>CallInfo</span> <span class=o>*</span><span class=n>luaD_precall</span> <span class=p>(</span><span class=n>lua_State</span> <span class=o>*</span><span class=n>L</span><span class=p>,</span> <span class=n>StkId</span> <span class=k>func</span><span class=p>,</span> <span class=ne>int</span> <span class=n>nresults</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl> <span class=n>retry</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>  <span class=k>switch</span> <span class=p>(</span><span class=n>ttypetag</span><span class=p>(</span><span class=n>s2v</span><span class=p>(</span><span class=k>func</span><span class=p>)))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>    <span class=k>case</span> <span class=n>LUA_VCCL</span><span class=p>:</span>  <span class=o>/*</span> <span class=n>C</span> <span class=n>closure</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>      <span class=o>...</span>
+</span></span><span class=line><span class=cl>    <span class=k>case</span> <span class=n>LUA_VLCF</span><span class=p>:</span>  <span class=o>/*</span> <span class=n>light</span> <span class=n>C</span> <span class=n>function</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>      <span class=o>...</span>
+</span></span><span class=line><span class=cl>    <span class=k>case</span> <span class=n>LUA_VLCL</span><span class=p>:</span> <span class=p>{</span>  <span class=o>/*</span> <span class=n>Lua</span> <span class=n>function</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>      <span class=n>CallInfo</span> <span class=o>*</span><span class=n>ci</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>      <span class=n>Proto</span> <span class=o>*</span><span class=n>p</span> <span class=o>=</span> <span class=n>clLvalue</span><span class=p>(</span><span class=n>s2v</span><span class=p>(</span><span class=k>func</span><span class=p>))</span><span class=o>-&gt;</span><span class=n>p</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>      <span class=ne>int</span> <span class=n>fsize</span> <span class=o>=</span> <span class=n>p</span><span class=o>-&gt;</span><span class=n>maxstacksize</span><span class=p>;</span>  <span class=o>/*</span> <span class=n>frame</span> <span class=n>size</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>      <span class=n>L</span><span class=o>-&gt;</span><span class=n>ci</span> <span class=o>=</span> <span class=n>ci</span> <span class=o>=</span> <span class=n>prepCallInfo</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=k>func</span><span class=p>,</span> <span class=n>nresults</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=k>func</span> <span class=o>+</span> <span class=mi>1</span> <span class=o>+</span> <span class=n>fsize</span><span class=p>);</span>  <span class=o>--</span> <span class=err>建立关系</span>
+</span></span><span class=line><span class=cl>      <span class=n>ci</span><span class=o>-&gt;</span><span class=n>u</span><span class=o>.</span><span class=n>l</span><span class=o>.</span><span class=n>savedpc</span> <span class=o>=</span> <span class=n>p</span><span class=o>-&gt;</span><span class=n>code</span><span class=p>;</span>  <span class=o>//</span> <span class=err>字节码指针在这里被设置到初始位置</span>
+</span></span><span class=line><span class=cl>      
+</span></span><span class=line><span class=cl>      <span class=o>//</span> <span class=err>修复传入的参数，如果传入的参数比预计的少，就补充</span> <span class=n>NIL</span>
+</span></span><span class=line><span class=cl>      <span class=ne>int</span> <span class=n>narg</span> <span class=o>=</span> <span class=n>cast_int</span><span class=p>(</span><span class=n>L</span><span class=o>-&gt;</span><span class=n>top</span><span class=o>.</span><span class=n>p</span> <span class=o>-</span> <span class=k>func</span><span class=p>)</span> <span class=o>-</span> <span class=mi>1</span><span class=p>;</span>  <span class=o>/*</span> <span class=err>获取真实传入的参数</span> <span class=o>*/</span> 
+</span></span><span class=line><span class=cl>      <span class=ne>int</span> <span class=n>nfixparams</span> <span class=o>=</span> <span class=n>p</span><span class=o>-&gt;</span><span class=n>numparams</span><span class=p>;</span>   
+</span></span><span class=line><span class=cl>      <span class=k>for</span> <span class=p>(;</span> <span class=n>narg</span> <span class=o>&lt;</span> <span class=n>nfixparams</span><span class=p>;</span> <span class=n>narg</span><span class=o>++</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>        <span class=n>setnilvalue</span><span class=p>(</span><span class=n>s2v</span><span class=p>(</span><span class=n>L</span><span class=o>-&gt;</span><span class=n>top</span><span class=o>.</span><span class=n>p</span><span class=o>++</span><span class=p>));</span>  <span class=o>/*</span> <span class=n>complete</span> <span class=n>missing</span> <span class=n>arguments</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>      <span class=n>lua_assert</span><span class=p>(</span><span class=n>ci</span><span class=o>-&gt;</span><span class=n>top</span><span class=o>.</span><span class=n>p</span> <span class=o>&lt;=</span> <span class=n>L</span><span class=o>-&gt;</span><span class=n>stack_last</span><span class=o>.</span><span class=n>p</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>      <span class=k>return</span> <span class=n>ci</span><span class=p>;</span>  
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>    <span class=n>default</span><span class=p>:</span> 
+</span></span><span class=line><span class=cl>      <span class=o>...</span> <span class=o>//</span> <span class=n>try</span> <span class=n>to</span> <span class=n>get</span> <span class=s1>&#39;__call&#39;</span> <span class=n>metamethod</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>l_sinline</span> <span class=n>CallInfo</span> <span class=o>*</span><span class=n>prepCallInfo</span> <span class=p>(</span><span class=n>lua_State</span> <span class=o>*</span><span class=n>L</span><span class=p>,</span> <span class=n>StkId</span> <span class=k>func</span><span class=p>,</span> <span class=ne>int</span> <span class=n>nret</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                                                <span class=ne>int</span> <span class=n>mask</span><span class=p>,</span> <span class=n>StkId</span> <span class=n>top</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>CallInfo</span> <span class=o>*</span><span class=n>ci</span> <span class=o>=</span> <span class=n>L</span><span class=o>-&gt;</span><span class=n>ci</span> <span class=o>=</span> <span class=n>next_ci</span><span class=p>(</span><span class=n>L</span><span class=p>);</span>  <span class=o>/*</span> <span class=n>new</span> <span class=n>frame</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>  <span class=n>ci</span><span class=o>-&gt;</span><span class=k>func</span><span class=o>.</span><span class=n>p</span> <span class=o>=</span> <span class=k>func</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>ci</span><span class=o>-&gt;</span><span class=n>nresults</span> <span class=o>=</span> <span class=n>nret</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>ci</span><span class=o>-&gt;</span><span class=n>callstatus</span> <span class=o>=</span> <span class=n>mask</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>ci</span><span class=o>-&gt;</span><span class=n>top</span><span class=o>.</span><span class=n>p</span> <span class=o>=</span> <span class=n>top</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=k>return</span> <span class=n>ci</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>这边只看 LUA_VLCL，这个是 lua 的函数类型，这边可以看到关系是在 prepCallInfo 中建立的，新初始的CallInfo将指针指向了Closure，并且初始化了新的调用栈的信息。</p><p>接下来看 luaV_execute 是如何执行的</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>void</span> <span class=n>luaV_execute</span> <span class=p>(</span><span class=n>lua_State</span> <span class=o>*</span><span class=n>L</span><span class=p>,</span> <span class=n>CallInfo</span> <span class=o>*</span><span class=n>ci</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>LClosure</span> <span class=o>*</span><span class=n>cl</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>TValue</span> <span class=o>*</span><span class=n>k</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>StkId</span> <span class=n>base</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=k>const</span> <span class=n>Instruction</span> <span class=o>*</span><span class=n>pc</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=o>......</span>
+</span></span><span class=line><span class=cl>  <span class=n>cl</span> <span class=o>=</span> <span class=n>clLvalue</span><span class=p>(</span><span class=n>s2v</span><span class=p>(</span><span class=n>ci</span><span class=o>-&gt;</span><span class=k>func</span><span class=o>.</span><span class=n>p</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>  <span class=n>k</span> <span class=o>=</span> <span class=n>cl</span><span class=o>-&gt;</span><span class=n>p</span><span class=o>-&gt;</span><span class=n>k</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>pc</span> <span class=o>=</span> <span class=n>ci</span><span class=o>-&gt;</span><span class=n>u</span><span class=o>.</span><span class=n>l</span><span class=o>.</span><span class=n>savedpc</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=o>......</span>
+</span></span><span class=line><span class=cl>  <span class=n>base</span> <span class=o>=</span> <span class=n>ci</span><span class=o>-&gt;</span><span class=k>func</span><span class=o>.</span><span class=n>p</span> <span class=o>+</span> <span class=mi>1</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=o>/*</span> <span class=n>main</span> <span class=n>loop</span> <span class=n>of</span> <span class=n>interpreter</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>  <span class=k>for</span> <span class=p>(;;)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>      <span class=n>Instruction</span> <span class=n>i</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>      <span class=n>vmfetch</span><span class=p>();</span>  <span class=o>//</span> <span class=err>这边的大致相当于执行</span> <span class=p>(</span><span class=n>base</span> <span class=o>=</span> <span class=n>ci</span><span class=o>-&gt;</span><span class=k>func</span><span class=o>.</span><span class=n>p</span> <span class=o>+</span> <span class=mi>1</span><span class=p>);</span> <span class=p>}</span> <span class=n>i</span> <span class=o>=</span> <span class=o>*</span><span class=p>(</span><span class=n>pc</span><span class=o>++</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>      <span class=o>......</span>
+</span></span><span class=line><span class=cl>      <span class=n>vmdispatch</span> <span class=p>(</span><span class=n>GET_OPCODE</span><span class=p>(</span><span class=n>i</span><span class=p>))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>        <span class=n>vmcase</span><span class=p>(</span><span class=n>OP_MOVE</span><span class=p>){</span><span class=o>.....</span><span class=p>}</span>
+</span></span><span class=line><span class=cl>        <span class=n>vmcase</span><span class=p>(</span><span class=n>OP_LOADI</span><span class=p>){</span><span class=o>.....</span><span class=p>}</span>
+</span></span><span class=line><span class=cl>        <span class=n>vmcase</span><span class=p>(</span><span class=n>OP_LOADF</span><span class=p>){</span><span class=o>.....</span><span class=p>}</span>
+</span></span><span class=line><span class=cl>        <span class=n>vmcase</span><span class=p>(</span><span class=n>OP_LOADK</span><span class=p>){</span><span class=o>.....</span><span class=p>}</span>
+</span></span><span class=line><span class=cl>      <span class=p>}</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>在for循环里，指令的执行是根据i对应的字节码进行跳转执行的，而i在循环前都会通过 i = *(pc++) 进行获取。在 for 循环前，可以看到 pc 被赋值成 ci->u.l.savedpc , 而这个位置就是 Closure中的Proto的字节码数组。</p><h2 id=closure中的-upvalues-这个数组是怎么生成的>closure中的 upvalues 这个数组是怎么生成的</h2><p>对于最外层的Closure，再编译字节码的时候，就会计算出需要的upvalues数量，在 f_parser 的最后一行代码，调用了 luaF_initupvals 初始化最外层的closure。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>void luaF_initupvals (lua_State *L, LClosure *cl) {
+</span></span><span class=line><span class=cl>  int i;
+</span></span><span class=line><span class=cl>  for (i = 0; i &lt; cl-&gt;nupvalues; i++) {
+</span></span><span class=line><span class=cl>    GCObject *o = luaC_newobj(L, LUA_VUPVAL, sizeof(UpVal));
+</span></span><span class=line><span class=cl>    UpVal *uv = gco2upv(o);
+</span></span><span class=line><span class=cl>    uv-&gt;v.p = &amp;uv-&gt;u.value;  /* make it closed */
+</span></span><span class=line><span class=cl>    setnilvalue(uv-&gt;v.p);
+</span></span><span class=line><span class=cl>    cl-&gt;upvals[i] = uv;
+</span></span><span class=line><span class=cl>    luaC_objbarrier(L, cl, uv);
+</span></span><span class=line><span class=cl>  }
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>这边会把最外层的Closure都初始化成nil，这样空间就预留出来了，后续字节码就能直接对这些空间进行初始化等一系列操作。</p><p>而对于内层函数产生的Closure，我们可以通过对应的字节码发现端倪</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span><span class=lnt>9
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>function f()
+</span></span><span class=line><span class=cl>    
+</span></span><span class=line><span class=cl>    local a = 1
+</span></span><span class=line><span class=cl>    function f2()
+</span></span><span class=line><span class=cl>        a = a + 1
+</span></span><span class=line><span class=cl>        return a
+</span></span><span class=line><span class=cl>    end
+</span></span><span class=line><span class=cl>    return f2
+</span></span><span class=line><span class=cl>end
+</span></span></code></pre></td></tr></table></div></div><p>通过 luac -l 获取上述lua代码的字节码</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>main</span> <span class=o>&lt;</span><span class=n>test</span><span class=o>/</span><span class=n>test_main</span><span class=o>.</span><span class=n>lua</span><span class=p>:</span><span class=mi>0</span><span class=p>,</span><span class=mi>0</span><span class=o>&gt;</span> <span class=p>(</span><span class=mi>4</span> <span class=n>instructions</span> <span class=n>at</span> <span class=mh>0x562d63b0ace0</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=mi>0</span><span class=o>+</span> <span class=n>params</span><span class=p>,</span> <span class=mi>2</span> <span class=n>slots</span><span class=p>,</span> <span class=mi>1</span> <span class=n>upvalue</span><span class=p>,</span> <span class=mi>0</span> <span class=n>locals</span><span class=p>,</span> <span class=mi>1</span> <span class=n>constant</span><span class=p>,</span> <span class=mi>1</span> <span class=n>function</span>
+</span></span><span class=line><span class=cl>        <span class=mi>1</span>       <span class=p>[</span><span class=mi>1</span><span class=p>]</span>     <span class=n>VARARGPREP</span>      <span class=mi>0</span>
+</span></span><span class=line><span class=cl>        <span class=mi>2</span>       <span class=p>[</span><span class=mi>12</span><span class=p>]</span>    <span class=n>CLOSURE</span>         <span class=mi>0</span> <span class=mi>0</span>     <span class=p>;</span> <span class=mh>0x562d63b0af40</span>
+</span></span><span class=line><span class=cl>        <span class=mi>3</span>       <span class=p>[</span><span class=mi>4</span><span class=p>]</span>     <span class=n>SETTABUP</span>        <span class=mi>0</span> <span class=mi>0</span> <span class=mi>0</span>   <span class=p>;</span> <span class=n>_ENV</span> <span class=s2>&#34;f&#34;</span>
+</span></span><span class=line><span class=cl>        <span class=mi>4</span>       <span class=p>[</span><span class=mi>12</span><span class=p>]</span>    <span class=n>RETURN</span>          <span class=mi>0</span> <span class=mi>1</span> <span class=mi>1</span>   <span class=p>;</span> <span class=mi>0</span> <span class=n>out</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>function</span> <span class=o>&lt;</span><span class=n>test</span><span class=o>/</span><span class=n>test_main</span><span class=o>.</span><span class=n>lua</span><span class=p>:</span><span class=mi>4</span><span class=p>,</span><span class=mi>12</span><span class=o>&gt;</span> <span class=p>(</span><span class=mi>6</span> <span class=n>instructions</span> <span class=n>at</span> <span class=mh>0x562d63b0af40</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=mi>0</span> <span class=n>params</span><span class=p>,</span> <span class=mi>2</span> <span class=n>slots</span><span class=p>,</span> <span class=mi>1</span> <span class=n>upvalue</span><span class=p>,</span> <span class=mi>1</span> <span class=n>local</span><span class=p>,</span> <span class=mi>1</span> <span class=n>constant</span><span class=p>,</span> <span class=mi>1</span> <span class=n>function</span>  
+</span></span><span class=line><span class=cl>        <span class=mi>1</span>       <span class=p>[</span><span class=mi>6</span><span class=p>]</span>     <span class=n>LOADI</span>           <span class=mi>0</span> <span class=mi>1</span>                         <span class=o>--</span> <span class=err>这边对应</span> <span class=n>local</span> <span class=n>a</span> <span class=o>=</span> <span class=mi>1</span>
+</span></span><span class=line><span class=cl>        <span class=mi>2</span>       <span class=p>[</span><span class=mi>10</span><span class=p>]</span>    <span class=n>CLOSURE</span>         <span class=mi>1</span> <span class=mi>0</span>     <span class=p>;</span> <span class=mh>0x562d63b0b320</span>    <span class=o>--</span> <span class=err>创建闭包</span> <span class=err>函数地址是</span><span class=mh>0x562d63b0b320</span>
+</span></span><span class=line><span class=cl>        <span class=mi>3</span>       <span class=p>[</span><span class=mi>7</span><span class=p>]</span>     <span class=n>SETTABUP</span>        <span class=mi>0</span> <span class=mi>0</span> <span class=mi>1</span>   <span class=p>;</span> <span class=n>_ENV</span> <span class=s2>&#34;f2&#34;</span>         <span class=o>--</span> <span class=err>设置到</span> <span class=n>_ENV</span> <span class=err>中</span>
+</span></span><span class=line><span class=cl>        <span class=mi>4</span>       <span class=p>[</span><span class=mi>11</span><span class=p>]</span>    <span class=n>GETTABUP</span>        <span class=mi>1</span> <span class=mi>0</span> <span class=mi>0</span>   <span class=p>;</span> <span class=n>_ENV</span> <span class=s2>&#34;f2&#34;</span>
+</span></span><span class=line><span class=cl>        <span class=mi>5</span>       <span class=p>[</span><span class=mi>11</span><span class=p>]</span>    <span class=n>RETURN</span>          <span class=mi>1</span> <span class=mi>2</span> <span class=mi>0</span><span class=n>k</span>  <span class=p>;</span> <span class=mi>1</span> <span class=n>out</span>
+</span></span><span class=line><span class=cl>        <span class=mi>6</span>       <span class=p>[</span><span class=mi>12</span><span class=p>]</span>    <span class=n>RETURN</span>          <span class=mi>1</span> <span class=mi>1</span> <span class=mi>0</span><span class=n>k</span>  <span class=p>;</span> <span class=mi>0</span> <span class=n>out</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>function</span> <span class=o>&lt;</span><span class=n>test</span><span class=o>/</span><span class=n>test_main</span><span class=o>.</span><span class=n>lua</span><span class=p>:</span><span class=mi>7</span><span class=p>,</span><span class=mi>10</span><span class=o>&gt;</span> <span class=p>(</span><span class=mi>7</span> <span class=n>instructions</span> <span class=n>at</span> <span class=mh>0x562d63b0b320</span><span class=p>)</span>  
+</span></span><span class=line><span class=cl><span class=mi>0</span> <span class=n>params</span><span class=p>,</span> <span class=mi>2</span> <span class=n>slots</span><span class=p>,</span> <span class=mi>1</span> <span class=n>upvalue</span><span class=p>,</span> <span class=mi>0</span> <span class=n>locals</span><span class=p>,</span> <span class=mi>0</span> <span class=n>constants</span><span class=p>,</span> <span class=mi>0</span> <span class=n>functions</span>
+</span></span><span class=line><span class=cl>        <span class=mi>1</span>       <span class=p>[</span><span class=mi>8</span><span class=p>]</span>     <span class=n>GETUPVAL</span>        <span class=mi>0</span> <span class=mi>0</span>     <span class=p>;</span> <span class=n>a</span>
+</span></span><span class=line><span class=cl>        <span class=mi>2</span>       <span class=p>[</span><span class=mi>8</span><span class=p>]</span>     <span class=n>ADDI</span>            <span class=mi>0</span> <span class=mi>0</span> <span class=mi>1</span>
+</span></span><span class=line><span class=cl>        <span class=mi>3</span>       <span class=p>[</span><span class=mi>8</span><span class=p>]</span>     <span class=n>MMBINI</span>          <span class=mi>0</span> <span class=mi>1</span> <span class=mi>6</span> <span class=mi>0</span> <span class=p>;</span> <span class=n>__add</span>
+</span></span><span class=line><span class=cl>        <span class=mi>4</span>       <span class=p>[</span><span class=mi>8</span><span class=p>]</span>     <span class=n>SETUPVAL</span>        <span class=mi>0</span> <span class=mi>0</span>     <span class=p>;</span> <span class=n>a</span>
+</span></span><span class=line><span class=cl>        <span class=mi>5</span>       <span class=p>[</span><span class=mi>9</span><span class=p>]</span>     <span class=n>GETUPVAL</span>        <span class=mi>0</span> <span class=mi>0</span>     <span class=p>;</span> <span class=n>a</span>
+</span></span><span class=line><span class=cl>        <span class=mi>6</span>       <span class=p>[</span><span class=mi>9</span><span class=p>]</span>     <span class=n>RETURN1</span>         <span class=mi>0</span>
+</span></span><span class=line><span class=cl>        <span class=mi>7</span>       <span class=p>[</span><span class=mi>10</span><span class=p>]</span>    <span class=n>RETURN0</span>  
+</span></span></code></pre></td></tr></table></div></div><p>在funcction f 中，通过 CLOSURE 创建出了对应的closure，CLOSURE 对应的字节码是OP_CLOSURE.</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>vmcase</span><span class=p>(</span><span class=n>OP_CLOSURE</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=n>StkId</span> <span class=n>ra</span> <span class=o>=</span> <span class=n>RA</span><span class=p>(</span><span class=n>i</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=n>Proto</span> <span class=o>*</span><span class=n>p</span> <span class=o>=</span> <span class=n>cl</span><span class=o>-&gt;</span><span class=n>p</span><span class=o>-&gt;</span><span class=n>p</span><span class=p>[</span><span class=n>GETARG_Bx</span><span class=p>(</span><span class=n>i</span><span class=p>)];</span>   <span class=o>---</span> <span class=err>这边取出的是</span><span class=n>Proto</span><span class=err>，说明</span><span class=mh>0x562d63b0b320</span><span class=err>应该对应的就是</span><span class=n>Proto</span>
+</span></span><span class=line><span class=cl>  <span class=n>halfProtect</span><span class=p>(</span><span class=n>pushclosure</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>p</span><span class=p>,</span> <span class=n>cl</span><span class=o>-&gt;</span><span class=n>upvals</span><span class=p>,</span> <span class=n>base</span><span class=p>,</span> <span class=n>ra</span><span class=p>));</span>  <span class=o>---</span> <span class=err>创建</span><span class=n>Closure</span><span class=err>，并塞到栈里</span>
+</span></span><span class=line><span class=cl>  <span class=n>checkGC</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>ra</span> <span class=o>+</span> <span class=mi>1</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=n>vmbreak</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=k>static</span> <span class=n>void</span> <span class=n>pushclosure</span> <span class=p>(</span><span class=n>lua_State</span> <span class=o>*</span><span class=n>L</span><span class=p>,</span> <span class=n>Proto</span> <span class=o>*</span><span class=n>p</span><span class=p>,</span> <span class=n>UpVal</span> <span class=o>**</span><span class=n>encup</span><span class=p>,</span> <span class=n>StkId</span> <span class=n>base</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>                         <span class=n>StkId</span> <span class=n>ra</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>  <span class=ne>int</span> <span class=n>nup</span> <span class=o>=</span> <span class=n>p</span><span class=o>-&gt;</span><span class=n>sizeupvalues</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>Upvaldesc</span> <span class=o>*</span><span class=n>uv</span> <span class=o>=</span> <span class=n>p</span><span class=o>-&gt;</span><span class=n>upvalues</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=ne>int</span> <span class=n>i</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>LClosure</span> <span class=o>*</span><span class=n>ncl</span> <span class=o>=</span> <span class=n>luaF_newLclosure</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>nup</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>  <span class=n>ncl</span><span class=o>-&gt;</span><span class=n>p</span> <span class=o>=</span> <span class=n>p</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>  <span class=n>setclLvalue2s</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>ra</span><span class=p>,</span> <span class=n>ncl</span><span class=p>);</span>  <span class=o>/*</span> <span class=n>anchor</span> <span class=n>new</span> <span class=n>closure</span> <span class=ow>in</span> <span class=n>stack</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>  <span class=o>//</span> <span class=err>这边对</span><span class=n>UpValues做赋值</span>
+</span></span><span class=line><span class=cl>  <span class=k>for</span> <span class=p>(</span><span class=n>i</span> <span class=o>=</span> <span class=mi>0</span><span class=p>;</span> <span class=n>i</span> <span class=o>&lt;</span> <span class=n>nup</span><span class=p>;</span> <span class=n>i</span><span class=o>++</span><span class=p>)</span> <span class=p>{</span>  <span class=o>/*</span> <span class=n>fill</span> <span class=ow>in</span> <span class=n>its</span> <span class=n>upvalues</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=p>(</span><span class=n>uv</span><span class=p>[</span><span class=n>i</span><span class=p>]</span><span class=o>.</span><span class=n>instack</span><span class=p>)</span>  <span class=o>/*</span> <span class=n>upvalue</span> <span class=n>refers</span> <span class=n>to</span> <span class=n>local</span> <span class=n>variable</span><span class=err>?</span> <span class=o>*/</span>  
+</span></span><span class=line><span class=cl>      <span class=n>ncl</span><span class=o>-&gt;</span><span class=n>upvals</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=n>luaF_findupval</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>base</span> <span class=o>+</span> <span class=n>uv</span><span class=p>[</span><span class=n>i</span><span class=p>]</span><span class=o>.</span><span class=n>idx</span><span class=p>);</span>  <span class=o>//</span> <span class=err>如果在栈上，就通过</span><span class=n>idx直接获取赋值</span>
+</span></span><span class=line><span class=cl>    <span class=k>else</span>  <span class=o>/*</span> <span class=n>get</span> <span class=n>upvalue</span> <span class=n>from</span> <span class=n>enclosing</span> <span class=n>function</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>      <span class=n>ncl</span><span class=o>-&gt;</span><span class=n>upvals</span><span class=p>[</span><span class=n>i</span><span class=p>]</span> <span class=o>=</span> <span class=n>encup</span><span class=p>[</span><span class=n>uv</span><span class=p>[</span><span class=n>i</span><span class=p>]</span><span class=o>.</span><span class=n>idx</span><span class=p>];</span>  <span class=o>//</span> <span class=err>如果不在栈上，说明需要通过对当前的</span><span class=n>Closure的upvalues进行间接获取</span>
+</span></span><span class=line><span class=cl>    <span class=n>luaC_objbarrier</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>ncl</span><span class=p>,</span> <span class=n>ncl</span><span class=o>-&gt;</span><span class=n>upvals</span><span class=p>[</span><span class=n>i</span><span class=p>]);</span>
+</span></span><span class=line><span class=cl>  <span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>可以看到在pushClosure的时候，会新初始化一个Closure，并通过 Proto 对upvals进行初始化，如果对应的upvals是在栈上的，则引用栈上对应的idx的变量。如果不在栈上的，则引用当前的Closure的upvals的对应变量。</p><p>这边存在一个比较特殊的点，从栈上赋值的时候，通过的是 newupval</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>static UpVal *newupval (lua_State *L, StkId level, UpVal **prev) {
+</span></span><span class=line><span class=cl>  GCObject *o = luaC_newobj(L, LUA_VUPVAL, sizeof(UpVal));
+</span></span><span class=line><span class=cl>  UpVal *uv = gco2upv(o);
+</span></span><span class=line><span class=cl>  UpVal *next = *prev;
+</span></span><span class=line><span class=cl>  uv-&gt;v.p = s2v(level);  /* current value lives in the stack */  // 从这边赋值的话，是会新建一个upvalues的，
+</span></span><span class=line><span class=cl>  ......
+</span></span><span class=line><span class=cl>  return uv;
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>s2v 的方式会把栈上的值通过拷贝的方式新建一个出来，所以这个时候会导致数值、字符串等都被静态拷贝一份，相当于创建闭包的时候会固定了</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>a = {}
+</span></span><span class=line><span class=cl>function f()
+</span></span><span class=line><span class=cl>    for i = 1, 5 do
+</span></span><span class=line><span class=cl>        a[i] = function() return i end  
+</span></span><span class=line><span class=cl>    end 
+</span></span><span class=line><span class=cl>end 
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>f()
+</span></span><span class=line><span class=cl>for k, v in pairs(a) do 
+</span></span><span class=line><span class=cl>    print(k, v()) 
+</span></span><span class=line><span class=cl>end
+</span></span><span class=line><span class=cl>-- 输出
+</span></span><span class=line><span class=cl>1       1
+</span></span><span class=line><span class=cl>2       2
+</span></span><span class=line><span class=cl>3       3
+</span></span><span class=line><span class=cl>4       4
+</span></span><span class=line><span class=cl>5       5
+</span></span></code></pre></td></tr></table></div></div><p>而对于非栈的赋值，是直接拷贝 encup[uv[i].idx] 的， 这个时候无论是不是数值，都是变成引用。如果存在多层的upvalus的嵌套时，最好别混用这些行为。更建议都统一认为upvalues都是对外面的引用，这样出错的概率会小一点</p><h2 id=使用gdb-验证>使用GDB 验证</h2><p>在GDB环境下执行 lua xxxx.lua 脚本，可以看到以下栈</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span><span class=lnt>9
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>#0  luaV_execute (L=0x5555557ac268, ci=0x5555557adab0) at lvm.c:1156
+</span></span><span class=line><span class=cl>#1  0x00005555555642d6 in ccall (L=0x5555557ac268, func=0x5555557ac910, nResults=-1, inc=65537) at ldo.c:637
+</span></span><span class=line><span class=cl>#2  0x000055555556434b in luaD_callnoyield (L=0x5555557ac268, func=0x5555557ac910, nResults=-1) at ldo.c:655
+</span></span><span class=line><span class=cl>....
+</span></span><span class=line><span class=cl>#7  0x000055555555b6e7 in docall (L=0x5555557ac268, narg=0, nres=-1) at lua.c:160
+</span></span><span class=line><span class=cl>#8  0x000055555555bb07 in handle_script (L=0x5555557ac268, argv=0x7fffffffddd0) at lua.c:256
+</span></span><span class=line><span class=cl>#9  0x000055555555c7c8 in pmain (L=0x5555557ac268) at lua.c:645
+</span></span><span class=line><span class=cl>....
+</span></span><span class=line><span class=cl>#18 0x000055555555c916 in main (argc=2, argv=0x7fffffffddc8) at lua.c:673
+</span></span></code></pre></td></tr></table></div></div><p>其中，</p><ul><li>在 handle_script 中执行了 luaL_loadfile 将脚本加载到内存并完成词法分析，并将 Closure 设置到了栈顶</li><li>在 handle_script 中准备开始调用的时候，是通过 docall 进行的，这边n是执行lua脚本时给的参数数量，返回值个数被写死成 LUA_MULTRET</li><li>在 docall 中，执行前第一步就是将base 取出，base取出的方式是通过<div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>base = lua_gettop(L) - narg
+</span></span></code></pre></td></tr></table></div></div>这样base就是词法分析得到的 Closure</li><li>到 ccall 后，对应的入参就是func 就是之前说的Closure，然后通过 luaD_precall 进行初始化，最后执行 luaV_execute 完成调用</li></ul><h2 id=小结>小结</h2><p>这边基本完成了对Lua内执行一个脚本的流程的分析，梳理了对应的数据结构和数据的流向，对未来更深入了解Lua虚拟机做了一些铺垫。
+个人认为相比于Python的虚拟机来说，Lua虚拟机设计的还是比较精炼的，但精炼就会带来一些地方会比较难以理解，需要多看两遍用GDB跟着实验一下会更能理解其中的设计</p></section><footer class=article-footer><section class=article-copyright><svg class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><path d="M14.5 9a3.5 4 0 100 6"/></svg>
+<span>Licensed under CC BY-NC-SA 4.0</span></section><section class=article-lastmod><svg class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<span>Last updated on 2024-09-20 00:00 UTC</span></section></footer></article><aside class=related-content--wrapper><h2 class=section-title>Related content</h2><div class=related-content><div class="flex article-list--tile"><article class=has-image><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-chunk-%E5%8A%A0%E8%BD%BD%E7%9B%B8%E5%85%B3/><div class=article-image><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-chunk-%E5%8A%A0%E8%BD%BD%E7%9B%B8%E5%85%B3/lua.7d4a78cb68c4bf6f949bf65679bd0293_hu4963494264007616310.png width=250 height=150 loading=lazy alt="Featured image of post Lua 源码阅读笔记-chunk 加载相关" data-hash="md5-fUp4y2jEv2+Um/ZWeb0Ckw=="></div><div class=article-details><h2 class=article-title>Lua 源码阅读笔记-chunk 加载相关</h2></div></a></article><article class=has-image><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/><div class=article-image><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-table/lua.7d4a78cb68c4bf6f949bf65679bd0293_hu4963494264007616310.png width=250 height=150 loading=lazy alt="Featured image of post Lua 源码阅读笔记-Table" data-hash="md5-fUp4y2jEv2+Um/ZWeb0Ckw=="></div><div class=article-details><h2 class=article-title>Lua 源码阅读笔记-Table</h2></div></a></article><article class=has-image><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/><div class=article-image><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-string/lua.7d4a78cb68c4bf6f949bf65679bd0293_hu4963494264007616310.png width=250 height=150 loading=lazy alt="Featured image of post Lua 源码阅读笔记-String" data-hash="md5-fUp4y2jEv2+Um/ZWeb0Ckw=="></div><div class=article-details><h2 class=article-title>Lua 源码阅读笔记-String</h2></div></a></article><article class=has-image><a href=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/><div class=article-image><img src=/p/lua-%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0-%E5%9F%BA%E6%9C%AC%E7%B1%BB%E5%9E%8B/lua.7d4a78cb68c4bf6f949bf65679bd0293_hu4963494264007616310.png width=250 height=150 loading=lazy alt="Featured image of post Lua 源码阅读笔记-基本类型" data-hash="md5-fUp4y2jEv2+Um/ZWeb0Ckw=="></div><div class=article-details><h2 class=article-title>Lua 源码阅读笔记-基本类型</h2></div></a></article></div></div></aside><script src=https://utteranc.es/client.js repo=FrozenLychees/FrozenLychees.github.io issue-term=pathname label=comments crossorigin=anonymous async></script><style>.utterances{max-width:unset}</style><script>let utterancesLoaded=!1;function setUtterancesTheme(e){let t=document.querySelector(".utterances iframe");t&&t.contentWindow.postMessage({type:"set-theme",theme:`github-${e}`},"https://utteranc.es")}addEventListener("message",e=>{if(e.origin!=="https://utteranc.es")return;utterancesLoaded=!0,setUtterancesTheme(document.documentElement.dataset.scheme)}),window.addEventListener("onColorSchemeChange",e=>{if(!utterancesLoaded)return;setUtterancesTheme(e.detail)})</script><footer class=site-footer><section class=copyright>&copy;
+2020 -
+2024 FrozenLychees</section><section class=powerby>Built with <a href=https://gohugo.io/ target=_blank rel=noopener>Hugo</a><br>Theme <b><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank rel=noopener data-version=3.26.0>Stack</a></b> designed by <a href=https://jimmycai.com target=_blank rel=noopener>Jimmy</a></section></footer><div class=pswp tabindex=-1 role=dialog aria-hidden=true><div class=pswp__bg></div><div class=pswp__scroll-wrap><div class=pswp__container><div class=pswp__item></div><div class=pswp__item></div><div class=pswp__item></div></div><div class="pswp__ui pswp__ui--hidden"><div class=pswp__top-bar><div class=pswp__counter></div><button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+<button class="pswp__button pswp__button--share" title=Share></button>
+<button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+<button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button><div class=pswp__preloader><div class=pswp__preloader__icn><div class=pswp__preloader__cut><div class=pswp__preloader__donut></div></div></div></div></div><div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap"><div class=pswp__share-tooltip></div></div><button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+</button>
+<button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)"></button><div class=pswp__caption><div class=pswp__caption__center></div></div></div></div></div><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo=" crossorigin=anonymous defer></script><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU=" crossorigin=anonymous defer></script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css crossorigin=anonymous><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css crossorigin=anonymous></main></div><script src=https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z+KMkF24hUW8WePSA9HM=" crossorigin=anonymous></script><script type=text/javascript src=/ts/main.js defer></script><script>(function(){const e=document.createElement("link");e.href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap",e.type="text/css",e.rel="stylesheet",document.head.appendChild(e)})()</script></body></html>

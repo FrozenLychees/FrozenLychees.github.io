@@ -1,0 +1,393 @@
+<!doctype html><html lang=en-us dir=ltr><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><meta name=description content="Skynet源码阅读笔记-Snlua服务 snlua 服务是 skynet 中重要的服务之一，其主要功能是为了创建一个执行lua代码的服务, skynet在默认情况下执行的第一个服务就是 snlua bootstrap\n先看看其主要的的数据结构\n1 2 3 4 5 6 7 8 9 struct snlua { lua_State * L; // lua 服务的主线程 struct skynet_context * ctx; // skynet服务的上下文 size_t mem; // 目前的内存使用 size_t mem_report; // 内存警报阈值 size_t mem_limit; // 内存使用上限 lua_State * activeL; // 当前的活跃的lua 线程 ATOM_INT trap; // 标记设置signal_hook }; 之前在skynet_module中曾经提到过，创建一个新的服务时，对应的服务需要实现4个函数，用于初始化和释放\n1 2 3 4 5 6 7 8 struct skynet_module { const char * name; // 名字 void * module; // module的地址 skynet_dl_create create; // 创建module实例执行的函数 skynet_dl_init init; // 初始化module执行的函数 skynet_dl_release release; // 释放module执行函数 skynet_dl_signal signal; // module信号执行函数 }; 当skynet在初始化的时候，执行的第一个snlua的服务是snlua bootstrap, 以这个为例子看看snlua中对应的函数是如何实现的。\nsnlua_create 1 2 3 4 5 6 7 8 9 10 11 struct snlua * snlua_create(void) { struct snlua * l = skynet_malloc(sizeof(*l)); memset(l,0,sizeof(*l)); l->mem_report = MEMORY_WARNING_REPORT; l->mem_limit = 0; l->L = lua_newstate(lalloc, l); l->activeL = NULL; ATOM_INIT(&amp;l->trap , 0); return l; } snlua的创建函数，可以只是对上述属性进行一个简单的初始化操作，可以注意到在lua_newstate的时候传入了一个lalloc, 在这边对lua内存分配做了一个自定义的行为。\n"><title>Skynet源码阅读笔记(十)- Snlua 服务</title>
+<link rel=canonical href=https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/><link rel=stylesheet href=/scss/style.min.0304c6baf04e01a8fe70693791cb744d56a3578a3120a8796cefc66825aa39c7.css><meta property='og:title' content="Skynet源码阅读笔记(十)- Snlua 服务"><meta property='og:description' content="Skynet源码阅读笔记-Snlua服务 snlua 服务是 skynet 中重要的服务之一，其主要功能是为了创建一个执行lua代码的服务, skynet在默认情况下执行的第一个服务就是 snlua bootstrap\n先看看其主要的的数据结构\n1 2 3 4 5 6 7 8 9 struct snlua { lua_State * L; // lua 服务的主线程 struct skynet_context * ctx; // skynet服务的上下文 size_t mem; // 目前的内存使用 size_t mem_report; // 内存警报阈值 size_t mem_limit; // 内存使用上限 lua_State * activeL; // 当前的活跃的lua 线程 ATOM_INT trap; // 标记设置signal_hook }; 之前在skynet_module中曾经提到过，创建一个新的服务时，对应的服务需要实现4个函数，用于初始化和释放\n1 2 3 4 5 6 7 8 struct skynet_module { const char * name; // 名字 void * module; // module的地址 skynet_dl_create create; // 创建module实例执行的函数 skynet_dl_init init; // 初始化module执行的函数 skynet_dl_release release; // 释放module执行函数 skynet_dl_signal signal; // module信号执行函数 }; 当skynet在初始化的时候，执行的第一个snlua的服务是snlua bootstrap, 以这个为例子看看snlua中对应的函数是如何实现的。\nsnlua_create 1 2 3 4 5 6 7 8 9 10 11 struct snlua * snlua_create(void) { struct snlua * l = skynet_malloc(sizeof(*l)); memset(l,0,sizeof(*l)); l->mem_report = MEMORY_WARNING_REPORT; l->mem_limit = 0; l->L = lua_newstate(lalloc, l); l->activeL = NULL; ATOM_INIT(&amp;l->trap , 0); return l; } snlua的创建函数，可以只是对上述属性进行一个简单的初始化操作，可以注意到在lua_newstate的时候传入了一个lalloc, 在这边对lua内存分配做了一个自定义的行为。\n"><meta property='og:url' content='https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/'><meta property='og:site_name' content='FrozenLychees'><meta property='og:type' content='article'><meta property='article:section' content='Post'><meta property='article:published_time' content='2024-08-10T00:00:00+00:00'><meta property='article:modified_time' content='2024-08-10T00:00:00+00:00'><meta property='og:image' content='https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/skynet.png'><meta name=twitter:title content="Skynet源码阅读笔记(十)- Snlua 服务"><meta name=twitter:description content="Skynet源码阅读笔记-Snlua服务 snlua 服务是 skynet 中重要的服务之一，其主要功能是为了创建一个执行lua代码的服务, skynet在默认情况下执行的第一个服务就是 snlua bootstrap\n先看看其主要的的数据结构\n1 2 3 4 5 6 7 8 9 struct snlua { lua_State * L; // lua 服务的主线程 struct skynet_context * ctx; // skynet服务的上下文 size_t mem; // 目前的内存使用 size_t mem_report; // 内存警报阈值 size_t mem_limit; // 内存使用上限 lua_State * activeL; // 当前的活跃的lua 线程 ATOM_INT trap; // 标记设置signal_hook }; 之前在skynet_module中曾经提到过，创建一个新的服务时，对应的服务需要实现4个函数，用于初始化和释放\n1 2 3 4 5 6 7 8 struct skynet_module { const char * name; // 名字 void * module; // module的地址 skynet_dl_create create; // 创建module实例执行的函数 skynet_dl_init init; // 初始化module执行的函数 skynet_dl_release release; // 释放module执行函数 skynet_dl_signal signal; // module信号执行函数 }; 当skynet在初始化的时候，执行的第一个snlua的服务是snlua bootstrap, 以这个为例子看看snlua中对应的函数是如何实现的。\nsnlua_create 1 2 3 4 5 6 7 8 9 10 11 struct snlua * snlua_create(void) { struct snlua * l = skynet_malloc(sizeof(*l)); memset(l,0,sizeof(*l)); l->mem_report = MEMORY_WARNING_REPORT; l->mem_limit = 0; l->L = lua_newstate(lalloc, l); l->activeL = NULL; ATOM_INIT(&amp;l->trap , 0); return l; } snlua的创建函数，可以只是对上述属性进行一个简单的初始化操作，可以注意到在lua_newstate的时候传入了一个lalloc, 在这边对lua内存分配做了一个自定义的行为。\n"><meta name=twitter:card content="summary_large_image"><meta name=twitter:image content='https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/skynet.png'><link rel="shortcut icon" href=/favicon.png><script async src="https://www.googletagmanager.com/gtag/js?id=G-KCSZNN6B9X"></script><script>var dnt,doNotTrack=!1;if(!1&&(dnt=navigator.doNotTrack||window.doNotTrack||navigator.msDoNotTrack,doNotTrack=dnt=="1"||dnt=="yes"),!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-KCSZNN6B9X")}</script></head><body class=article-page><script>(function(){const e="StackColorScheme";localStorage.getItem(e)||localStorage.setItem(e,"auto")})()</script><script>(function(){const t="StackColorScheme",e=localStorage.getItem(t),n=window.matchMedia("(prefers-color-scheme: dark)").matches===!0;e=="dark"||e==="auto"&&n?document.documentElement.dataset.scheme="dark":document.documentElement.dataset.scheme="light"})()</script><div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky"><button class="hamburger hamburger--spin" type=button id=toggle-menu aria-label="Toggle Menu">
+<span class=hamburger-box><span class=hamburger-inner></span></span></button><header><figure class=site-avatar><a href=/><img src=/img/forzenLychees_hu14353860160155089042.jpg width=300 height=300 class=site-logo loading=lazy alt=Avatar>
+</a><span class=emoji>🍥</span></figure><div class=site-meta><h1 class=site-name><a href=/>FrozenLychees</a></h1><h2 class=site-description>天天摸鱼身体棒</h2></div></header><ol class=menu-social><li><a href=https://github.com/FrozenLychees target=_blank title=GitHub rel=me><svg class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6.0 00-1.3-3.2 4.2 4.2.0 00-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3.0 00-6.2.0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2.0 00-.1 3.2A4.6 4.6.0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a></li><li><a href=https://twitter.com target=_blank title=Twitter rel=me><svg class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-1.265-2.783-1.335-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84.0 00.497-3.753C20.18 7.773 21.692 5.25 22 4.009z"/></svg></a></li></ol><ol class=menu id=main-menu><li><a href=/><svg class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/><path d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"/></svg>
+<span>Home</span></a></li><li><a href=/archives/><svg class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><rect x="3" y="4" width="18" height="4" rx="2"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+<span>Archives</span></a></li><li><a href=/search/><svg class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+<span>Search</span></a></li><li><a href=/links/><svg class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 14a3.5 3.5.0 005 0l4-4a3.5 3.5.0 00-5-5l-.5.5"/><path d="M14 10a3.5 3.5.0 00-5 0l-4 4a3.5 3.5.0 005 5l.5-.5"/></svg>
+<span>Links</span></a></li><li class=menu-bottom-section><ol class=menu><li id=dark-mode-toggle><svg class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="8" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<svg class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="16" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<span>Dark Mode</span></li></ol></li></ol></aside><aside class="sidebar right-sidebar sticky"><section class="widget archives"><div class=widget-icon><svg class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="11" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="13" y2="20"/></svg></div><h2 class="widget-title section-title">Table of contents</h2><div class=widget--toc><nav id=TableOfContents><ol><li><a href=#snlua_create>snlua_create</a><ol><li><a href=#lalloc>lalloc</a></li></ol></li><li><a href=#snlua_init>snlua_init</a><ol><li><a href=#launch_cb>launch_cb</a></li><li><a href=#init_cb>init_cb</a></li></ol></li><li><a href=#snlua_signal>snlua_signal</a></li><li><a href=#snlua_release>snlua_release</a></li><li><a href=#小结>小结</a></li></ol></nav></div></section></aside><main class="main full-width"><article class="has-image main-article"><header class=article-header><div class=article-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/skynet_hu16783708442478653342.png srcset="/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/skynet_hu16783708442478653342.png 800w, /p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/skynet_hu3423359843825932324.png 1600w" width=800 height=174 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十)- Snlua 服务"></a></div><div class=article-details><header class=article-category><a href=/categories/skynet/>Skynet</a></header><div class=article-title-wrapper><h2 class=article-title><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/>Skynet源码阅读笔记(十)- Snlua 服务</a></h2></div><footer class=article-time><div><svg class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M11.795 21H5a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v4"/><circle cx="18" cy="18" r="4"/><path d="M15 3v4"/><path d="M7 3v4"/><path d="M3 11h16"/><path d="M18 16.496V18l1 1"/></svg>
+<time class=article-time--published>2024-08-10</time></div><div><svg class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<time class=article-time--reading>5 minute read</time></div></footer></div></header><section class=article-content><h1 id=skynet源码阅读笔记-snlua服务>Skynet源码阅读笔记-Snlua服务</h1><p>snlua 服务是 skynet 中重要的服务之一，其主要功能是为了创建一个执行lua代码的服务, skynet在默认情况下执行的第一个服务就是 snlua bootstrap</p><p>先看看其主要的的数据结构</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span><span class=lnt>9
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>struct</span> <span class=n>snlua</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_State</span> <span class=o>*</span> <span class=n>L</span><span class=p>;</span>   <span class=o>//</span> <span class=n>lua</span> <span class=err>服务的主线程</span>
+</span></span><span class=line><span class=cl>	<span class=n>struct</span> <span class=n>skynet_context</span> <span class=o>*</span> <span class=n>ctx</span><span class=p>;</span>  <span class=o>//</span> <span class=n>skynet服务的上下文</span>
+</span></span><span class=line><span class=cl>	<span class=n>size_t</span> <span class=n>mem</span><span class=p>;</span>      <span class=o>//</span>  <span class=err>目前的内存使用</span>
+</span></span><span class=line><span class=cl>	<span class=n>size_t</span> <span class=n>mem_report</span><span class=p>;</span>   <span class=o>//</span> <span class=err>内存警报阈值</span>
+</span></span><span class=line><span class=cl>	<span class=n>size_t</span> <span class=n>mem_limit</span><span class=p>;</span>    <span class=o>//</span> <span class=err>内存使用上限</span> 
+</span></span><span class=line><span class=cl>	<span class=n>lua_State</span> <span class=o>*</span> <span class=n>activeL</span><span class=p>;</span> <span class=o>//</span> <span class=err>当前的活跃的</span><span class=n>lua</span> <span class=err>线程</span>
+</span></span><span class=line><span class=cl> 	<span class=n>ATOM_INT</span> <span class=n>trap</span><span class=p>;</span>    <span class=o>//</span> <span class=err>标记设置</span><span class=n>signal_hook</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><p>之前在skynet_module中曾经提到过，创建一个新的服务时，对应的服务需要实现4个函数，用于初始化和释放</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span><span class=lnt>8
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>struct</span> <span class=n>skynet_module</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=k>const</span> <span class=n>char</span> <span class=o>*</span> <span class=n>name</span><span class=p>;</span> <span class=o>//</span> <span class=err>名字</span>
+</span></span><span class=line><span class=cl>	<span class=n>void</span> <span class=o>*</span> <span class=n>module</span><span class=p>;</span>  <span class=o>//</span> <span class=n>module的地址</span>
+</span></span><span class=line><span class=cl>	<span class=n>skynet_dl_create</span> <span class=n>create</span><span class=p>;</span>  <span class=o>//</span> <span class=err>创建</span><span class=n>module实例执行的函数</span> 
+</span></span><span class=line><span class=cl>	<span class=n>skynet_dl_init</span> <span class=n>init</span><span class=p>;</span>  <span class=o>//</span> <span class=err>初始化</span><span class=n>module执行的函数</span>
+</span></span><span class=line><span class=cl>	<span class=n>skynet_dl_release</span> <span class=n>release</span><span class=p>;</span> <span class=o>//</span> <span class=err>释放</span><span class=n>module执行函数</span>
+</span></span><span class=line><span class=cl>	<span class=n>skynet_dl_signal</span> <span class=k>signal</span><span class=p>;</span>  <span class=o>//</span>  <span class=n>module信号执行函数</span>
+</span></span><span class=line><span class=cl><span class=p>};</span>
+</span></span></code></pre></td></tr></table></div></div><p>当skynet在初始化的时候，执行的第一个snlua的服务是snlua bootstrap, 以这个为例子看看snlua中对应的函数是如何实现的。</p><h2 id=snlua_create>snlua_create</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>struct snlua *
+</span></span><span class=line><span class=cl>snlua_create(void) {
+</span></span><span class=line><span class=cl>	struct snlua * l = skynet_malloc(sizeof(*l));
+</span></span><span class=line><span class=cl>	memset(l,0,sizeof(*l));
+</span></span><span class=line><span class=cl>	l-&gt;mem_report = MEMORY_WARNING_REPORT;
+</span></span><span class=line><span class=cl>	l-&gt;mem_limit = 0;
+</span></span><span class=line><span class=cl>	l-&gt;L = lua_newstate(lalloc, l);
+</span></span><span class=line><span class=cl>	l-&gt;activeL = NULL;
+</span></span><span class=line><span class=cl>	ATOM_INIT(&amp;l-&gt;trap , 0);
+</span></span><span class=line><span class=cl>	return l;
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>snlua的创建函数，可以只是对上述属性进行一个简单的初始化操作，可以注意到在lua_newstate的时候传入了一个lalloc, 在这边对lua内存分配做了一个自定义的行为。</p><h3 id=lalloc>lalloc</h3><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>static void *
+</span></span><span class=line><span class=cl>lalloc(void * ud, void *ptr, size_t osize, size_t nsize) {
+</span></span><span class=line><span class=cl>	struct snlua *l = ud;
+</span></span><span class=line><span class=cl>	size_t mem = l-&gt;mem;
+</span></span><span class=line><span class=cl>	l-&gt;mem += nsize;
+</span></span><span class=line><span class=cl>	if (ptr)
+</span></span><span class=line><span class=cl>		l-&gt;mem -= osize;
+</span></span><span class=line><span class=cl>	if (l-&gt;mem_limit != 0 &amp;&amp; l-&gt;mem &gt; l-&gt;mem_limit) {
+</span></span><span class=line><span class=cl>		if (ptr == NULL || nsize &gt; osize) {
+</span></span><span class=line><span class=cl>			l-&gt;mem = mem;
+</span></span><span class=line><span class=cl>			return NULL;
+</span></span><span class=line><span class=cl>		}
+</span></span><span class=line><span class=cl>	}
+</span></span><span class=line><span class=cl>	if (l-&gt;mem &gt; l-&gt;mem_report) {
+</span></span><span class=line><span class=cl>		l-&gt;mem_report *= 2;
+</span></span><span class=line><span class=cl>		skynet_error(l-&gt;ctx, &#34;Memory warning %.2f M&#34;, (float)l-&gt;mem / (1024 * 1024));
+</span></span><span class=line><span class=cl>	}
+</span></span><span class=line><span class=cl>	return skynet_lalloc(ptr, osize, nsize);
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>lalloc 中主要干了两件事情</p><ol><li>对内存的分配进行了监控，超过一定限制会输出日志报警</li><li>调用skynet_lalloc来实际分配内存，这边先不展开，不过skynet_lalloc中使用的是jemalloc来对内存进行分配。</li></ol><h2 id=snlua_init>snlua_init</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=ne>int</span>
+</span></span><span class=line><span class=cl><span class=n>snlua_init</span><span class=p>(</span><span class=n>struct</span> <span class=n>snlua</span> <span class=o>*</span><span class=n>l</span><span class=p>,</span> <span class=n>struct</span> <span class=n>skynet_context</span> <span class=o>*</span><span class=n>ctx</span><span class=p>,</span> <span class=k>const</span> <span class=n>char</span> <span class=o>*</span> <span class=n>args</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>//</span> <span class=err>先把参数拷贝出来</span>
+</span></span><span class=line><span class=cl>	<span class=ne>int</span> <span class=n>sz</span> <span class=o>=</span> <span class=n>strlen</span><span class=p>(</span><span class=n>args</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>char</span> <span class=o>*</span> <span class=n>tmp</span> <span class=o>=</span> <span class=n>skynet_malloc</span><span class=p>(</span><span class=n>sz</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>memcpy</span><span class=p>(</span><span class=n>tmp</span><span class=p>,</span> <span class=n>args</span><span class=p>,</span> <span class=n>sz</span><span class=p>);</span>  <span class=o>//</span> <span class=n>args</span> <span class=err>这边是</span><span class=n>bootstrap</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=n>skynet_callback</span><span class=p>(</span><span class=n>ctx</span><span class=p>,</span> <span class=n>l</span><span class=p>,</span> <span class=n>launch_cb</span><span class=p>);</span> <span class=o>//</span> <span class=err>设置消息回调的接口和</span><span class=n>userData</span><span class=err>，这边设置进行去的</span><span class=n>ud是</span> <span class=n>l</span>
+</span></span><span class=line><span class=cl>    <span class=o>//</span> <span class=err>调用</span><span class=n>REG</span> <span class=err>来获取</span><span class=n>handle_id</span>
+</span></span><span class=line><span class=cl>	<span class=k>const</span> <span class=n>char</span> <span class=o>*</span> <span class=bp>self</span> <span class=o>=</span> <span class=n>skynet_command</span><span class=p>(</span><span class=n>ctx</span><span class=p>,</span> <span class=s2>&#34;REG&#34;</span><span class=p>,</span> <span class=n>NULL</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>uint32_t</span> <span class=n>handle_id</span> <span class=o>=</span> <span class=n>strtoul</span><span class=p>(</span><span class=bp>self</span><span class=o>+</span><span class=mi>1</span><span class=p>,</span> <span class=n>NULL</span><span class=p>,</span> <span class=mi>16</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=n>it</span> <span class=n>must</span> <span class=n>be</span> <span class=n>first</span> <span class=n>message</span> 
+</span></span><span class=line><span class=cl>	<span class=n>skynet_send</span><span class=p>(</span><span class=n>ctx</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=n>handle_id</span><span class=p>,</span> <span class=n>PTYPE_TAG_DONTCOPY</span><span class=p>,</span><span class=mi>0</span><span class=p>,</span> <span class=n>tmp</span><span class=p>,</span> <span class=n>sz</span><span class=p>);</span>  <span class=o>//</span> <span class=err>通过给自己发送一条消息的方式来触发后续的初始化操作</span>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=mi>0</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>init流程看似也很简单，但实际上是为了调用skynet_send来给自己发送一条消息，用消息回调的方式来触发剩余的初始化操作。
+不过为啥要用回调的方式以及为啥这个消息必须是第一条，我目前没有理解。</p><h3 id=launch_cb>launch_cb</h3><p>消息回调的时候首先调用的是launch_cb，在init的时候已经通过skynet_callback将ud和launch_cb设置到消息回调中了</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=k>static</span> <span class=ne>int</span>
+</span></span><span class=line><span class=cl><span class=n>launch_cb</span><span class=p>(</span><span class=n>struct</span> <span class=n>skynet_context</span> <span class=o>*</span> <span class=n>context</span><span class=p>,</span> <span class=n>void</span> <span class=o>*</span><span class=n>ud</span><span class=p>,</span> <span class=ne>int</span> <span class=n>type</span><span class=p>,</span> <span class=ne>int</span> <span class=n>session</span><span class=p>,</span> <span class=n>uint32_t</span> <span class=n>source</span> <span class=p>,</span> <span class=k>const</span> <span class=n>void</span> <span class=o>*</span> <span class=n>msg</span><span class=p>,</span> <span class=n>size_t</span> <span class=n>sz</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nb>assert</span><span class=p>(</span><span class=n>type</span> <span class=o>==</span> <span class=mi>0</span> <span class=o>&amp;&amp;</span> <span class=n>session</span> <span class=o>==</span> <span class=mi>0</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>struct</span> <span class=n>snlua</span> <span class=o>*</span><span class=n>l</span> <span class=o>=</span> <span class=n>ud</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=n>skynet_callback</span><span class=p>(</span><span class=n>context</span><span class=p>,</span> <span class=n>NULL</span><span class=p>,</span> <span class=n>NULL</span><span class=p>);</span>  <span class=o>//</span> <span class=err>这边又将回调的接口给重置了</span>
+</span></span><span class=line><span class=cl>	<span class=ne>int</span> <span class=n>err</span> <span class=o>=</span> <span class=n>init_cb</span><span class=p>(</span><span class=n>l</span><span class=p>,</span> <span class=n>context</span><span class=p>,</span> <span class=n>msg</span><span class=p>,</span> <span class=n>sz</span><span class=p>);</span>  <span class=o>//</span> <span class=err>真正的初始化位置</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=p>(</span><span class=n>err</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=n>skynet_command</span><span class=p>(</span><span class=n>context</span><span class=p>,</span> <span class=s2>&#34;EXIT&#34;</span><span class=p>,</span> <span class=n>NULL</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=mi>0</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>launch_cb 也只是用来包装调用init_cb，自身只是处理了如果init_cb出错了，就调用EXIT指令卸载掉当前的服务</p><h3 id=init_cb>init_cb</h3><p>init_cb 中就是初始化snlua服务的主要流程了，主要是 hook一些协程接口、处理路径相关、加载执行lua文件</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=k>static</span> <span class=ne>int</span>
+</span></span><span class=line><span class=cl><span class=n>init_cb</span><span class=p>(</span><span class=n>struct</span> <span class=n>snlua</span> <span class=o>*</span><span class=n>l</span><span class=p>,</span> <span class=n>struct</span> <span class=n>skynet_context</span> <span class=o>*</span><span class=n>ctx</span><span class=p>,</span> <span class=k>const</span> <span class=n>char</span> <span class=o>*</span> <span class=n>args</span><span class=p>,</span> <span class=n>size_t</span> <span class=n>sz</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_State</span> <span class=o>*</span><span class=n>L</span> <span class=o>=</span> <span class=n>l</span><span class=o>-&gt;</span><span class=n>L</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=n>l</span><span class=o>-&gt;</span><span class=n>ctx</span> <span class=o>=</span> <span class=n>ctx</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_gc</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>LUA_GCSTOP</span><span class=p>,</span> <span class=mi>0</span><span class=p>);</span> <span class=o>//</span> <span class=n>GC</span> <span class=n>STOP</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_pushboolean</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=mi>1</span><span class=p>);</span>  <span class=o>/*</span> <span class=k>signal</span> <span class=k>for</span> <span class=n>libraries</span> <span class=n>to</span> <span class=n>ignore</span> <span class=n>env</span><span class=o>.</span> <span class=n>vars</span><span class=o>.</span> <span class=o>*/</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_setfield</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>LUA_REGISTRYINDEX</span><span class=p>,</span> <span class=s2>&#34;LUA_NOENV&#34;</span><span class=p>);</span> <span class=o>//</span> <span class=err>跳过</span><span class=n>LUA_PATH和LUA_CPATH</span>
+</span></span><span class=line><span class=cl>	<span class=n>luaL_openlibs</span><span class=p>(</span><span class=n>L</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>luaL_requiref</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=s2>&#34;skynet.profile&#34;</span><span class=p>,</span> <span class=n>init_profile</span><span class=p>,</span> <span class=mi>0</span><span class=p>);</span>  <span class=o>//</span> <span class=n>require</span> <span class=n>skynet</span> <span class=n>profile</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>    <span class=o>//</span> <span class=n>hook</span> <span class=n>coroutine相关接口</span><span class=p>,</span> <span class=err>相当于下面的</span><span class=n>lua代码</span>
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=n>replace</span> <span class=n>coroutine</span><span class=o>.</span><span class=n>resume</span> <span class=o>/</span> <span class=n>coroutine</span><span class=o>.</span><span class=n>wrap</span>
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=n>coroutine</span><span class=p>[</span><span class=n>resume</span><span class=p>]</span> <span class=o>=</span> <span class=n>profile_lib</span><span class=p>[</span><span class=n>resume</span><span class=p>]</span>
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=n>coroutine</span><span class=p>[</span><span class=n>wrap</span><span class=p>]</span> <span class=o>=</span> <span class=n>profile_lib</span><span class=p>[</span><span class=n>wrap</span><span class=p>]</span>
+</span></span><span class=line><span class=cl>    <span class=o>...</span> 
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=err>相当于</span> <span class=n>LUA_REGISTRYINDEX</span><span class=p>[</span><span class=n>skynet_context</span><span class=p>]</span> <span class=o>=</span> <span class=n>ctx</span> 
+</span></span><span class=line><span class=cl>	<span class=n>lua_getglobal</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=s2>&#34;coroutine&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_getfield</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>profile_lib</span><span class=p>,</span> <span class=s2>&#34;resume&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_setfield</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=o>-</span><span class=mi>2</span><span class=p>,</span> <span class=s2>&#34;resume&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_getfield</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>profile_lib</span><span class=p>,</span> <span class=s2>&#34;wrap&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_setfield</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=o>-</span><span class=mi>2</span><span class=p>,</span> <span class=s2>&#34;wrap&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=o>...</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=err>设置路径，如果配置有提供</span><span class=n>lua_path</span><span class=err>、</span><span class=n>lua_cpath</span><span class=err>、</span><span class=n>luaservice</span> <span class=err>则使用配置的，</span> <span class=err>否则使用默认的</span>
+</span></span><span class=line><span class=cl>	<span class=k>const</span> <span class=n>char</span> <span class=o>*</span><span class=n>path</span> <span class=o>=</span> <span class=n>optstring</span><span class=p>(</span><span class=n>ctx</span><span class=p>,</span> <span class=s2>&#34;lua_path&#34;</span><span class=p>,</span><span class=s2>&#34;./lualib/?.lua;./lualib/?/init.lua&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>    <span class=o>....</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=err>加载</span><span class=n>lua</span> <span class=n>loader</span><span class=err>，</span> 
+</span></span><span class=line><span class=cl>	<span class=n>lua_pushcfunction</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>traceback</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=nb>assert</span><span class=p>(</span><span class=n>lua_gettop</span><span class=p>(</span><span class=n>L</span><span class=p>)</span> <span class=o>==</span> <span class=mi>1</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	
+</span></span><span class=line><span class=cl>	<span class=k>const</span> <span class=n>char</span> <span class=o>*</span> <span class=n>loader</span> <span class=o>=</span> <span class=n>optstring</span><span class=p>(</span><span class=n>ctx</span><span class=p>,</span> <span class=s2>&#34;lualoader&#34;</span><span class=p>,</span> <span class=s2>&#34;./lualib/loader.lua&#34;</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=ne>int</span> <span class=n>r</span> <span class=o>=</span> <span class=n>luaL_loadfile</span><span class=p>(</span><span class=n>L</span><span class=p>,</span><span class=n>loader</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=p>(</span><span class=n>r</span> <span class=o>!=</span> <span class=n>LUA_OK</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=n>skynet_error</span><span class=p>(</span><span class=n>ctx</span><span class=p>,</span> <span class=s2>&#34;Can&#39;t load </span><span class=si>%s</span><span class=s2> : </span><span class=si>%s</span><span class=s2>&#34;</span><span class=p>,</span> <span class=n>loader</span><span class=p>,</span> <span class=n>lua_tostring</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=o>-</span><span class=mi>1</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>		<span class=n>report_launcher_error</span><span class=p>(</span><span class=n>ctx</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>		<span class=k>return</span> <span class=mi>1</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=n>pcall</span> <span class=err>调用</span> <span class=err>如果报错了，则把错误信息打印出来</span>
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=err>这边一开始的</span><span class=n>args应该是</span> <span class=n>bootstrap</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_pushlstring</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>args</span><span class=p>,</span> <span class=n>sz</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>r</span> <span class=o>=</span> <span class=n>lua_pcall</span><span class=p>(</span><span class=n>L</span><span class=p>,</span><span class=mi>1</span><span class=p>,</span><span class=mi>0</span><span class=p>,</span><span class=mi>1</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=p>(</span><span class=n>r</span> <span class=o>!=</span> <span class=n>LUA_OK</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=n>skynet_error</span><span class=p>(</span><span class=n>ctx</span><span class=p>,</span> <span class=s2>&#34;lua loader error : </span><span class=si>%s</span><span class=s2>&#34;</span><span class=p>,</span> <span class=n>lua_tostring</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=o>-</span><span class=mi>1</span><span class=p>));</span>
+</span></span><span class=line><span class=cl>		<span class=n>report_launcher_error</span><span class=p>(</span><span class=n>ctx</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>		<span class=k>return</span> <span class=mi>1</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>	
+</span></span><span class=line><span class=cl>	<span class=o>//</span> <span class=err>如果</span> <span class=n>LUA_REGISTRYINDEX</span><span class=p>[</span><span class=n>memlimit</span><span class=p>]</span> <span class=err>有被设置的话，</span> <span class=err>则更新</span><span class=n>mem_limit</span>
+</span></span><span class=line><span class=cl>    <span class=k>if</span> <span class=p>(</span><span class=n>lua_getfield</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>LUA_REGISTRYINDEX</span><span class=p>,</span> <span class=s2>&#34;memlimit&#34;</span><span class=p>)</span> <span class=o>==</span> <span class=n>LUA_TNUMBER</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>        <span class=o>...</span>
+</span></span><span class=line><span class=cl>    <span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=n>lua_gc</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>LUA_GCRESTART</span><span class=p>,</span> <span class=mi>0</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=mi>0</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>init_cb 里面主要是使用了很多Lua的C API来执行了一系列操作，分为一下几个步骤</p><ol><li>替换掉系统的coroutine相关的操作</li><li>将ctx设置到全局变量中，以便C 和 lua更好的交互</li><li>设置require的路径</li><li>加载 loader.lua</li><li>调用 loader.lua args 。这边的args 内容最开始是 bootstrap.lua</li><li>设置 memlimit</li></ol><p>这边目前更关心 loader.lua bootstap 这个调用的过程</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=o>--</span> <span class=n>skynet</span><span class=o>.</span><span class=n>loader</span><span class=o>.</span><span class=n>lua</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=o>--</span> <span class=err>其他更多是在处理配置路径相关的事情</span>
+</span></span><span class=line><span class=cl><span class=o>--</span> <span class=n>main</span> <span class=o>=</span> <span class=nb>load</span><span class=p>(</span><span class=n>bootstap</span><span class=o>.</span><span class=n>lua</span><span class=p>)</span> <span class=n>snlua初始化的时候执行的是这个语句</span>
+</span></span><span class=line><span class=cl><span class=o>...</span> 
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=o>--</span> <span class=err>如果定义了</span><span class=n>LUA_PRELOAD</span><span class=err>，那么就先加载对应文件</span>
+</span></span><span class=line><span class=cl><span class=k>if</span> <span class=n>LUA_PRELOAD</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>	<span class=n>local</span> <span class=n>f</span> <span class=o>=</span> <span class=nb>assert</span><span class=p>(</span><span class=n>loadfile</span><span class=p>(</span><span class=n>LUA_PRELOAD</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>	<span class=n>f</span><span class=p>(</span><span class=n>table</span><span class=o>.</span><span class=n>unpack</span><span class=p>(</span><span class=n>args</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>	<span class=n>LUA_PRELOAD</span> <span class=o>=</span> <span class=n>nil</span>
+</span></span><span class=line><span class=cl><span class=n>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>_G</span><span class=o>.</span><span class=n>require</span> <span class=o>=</span> <span class=p>(</span><span class=n>require</span> <span class=s2>&#34;skynet.require&#34;</span><span class=p>)</span><span class=o>.</span><span class=n>require</span>  <span class=o>--</span> <span class=n>skynet</span><span class=o>.</span><span class=n>require</span> <span class=err>后续新开一个文档研究，这边可以认为是对于协程并行的一些处理，如果没有使用协程，那么这边就是普通的</span><span class=n>require</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>main</span><span class=p>(</span><span class=n>select</span><span class=p>(</span><span class=mi>2</span><span class=p>,</span> <span class=n>table</span><span class=o>.</span><span class=n>unpack</span><span class=p>(</span><span class=n>args</span><span class=p>)))</span>  <span class=o>--</span> <span class=err>这边就是执行服务的函数，</span><span class=n>main</span> <span class=err>对应的函数就是</span><span class=n>loadfile进来的</span>
+</span></span></code></pre></td></tr></table></div></div><p>loader.lua 中大部分都是处理服务路径相关的事情，需要注意的就是如果定义了LUA_PRELOAD，那么就会提前加载对应的模块。
+顺便再提一嘴，main函数是通过 loadfile(targeServiceFile) 的结果。</p><p>这边args再初始化加载的时候应该只有{bootstap}，所以main执行的时候是没有参数的。</p><p>init的流程先到此为止，这边知道skynet snlua服务会在init_cb的时候通过loadfile的方式将lua服务加载进来就行了。</p><p>之后具体的bootstrap流程还会具体在分析。这边先告一段落。</p><p>后续看看snlua的另外几个操作</p><h2 id=snlua_signal>snlua_signal</h2><p>singla接口主要是为了能让其他线程给snlua服务在跑的过程发送一些信号，以达到一些自定义的需求。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=n>void</span>
+</span></span><span class=line><span class=cl><span class=n>snlua_signal</span><span class=p>(</span><span class=n>struct</span> <span class=n>snlua</span> <span class=o>*</span><span class=n>l</span><span class=p>,</span> <span class=ne>int</span> <span class=k>signal</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=n>skynet_error</span><span class=p>(</span><span class=n>l</span><span class=o>-&gt;</span><span class=n>ctx</span><span class=p>,</span> <span class=s2>&#34;recv a signal </span><span class=si>%d</span><span class=s2>&#34;</span><span class=p>,</span> <span class=k>signal</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=p>(</span><span class=k>signal</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=p>(</span><span class=n>ATOM_LOAD</span><span class=p>(</span><span class=o>&amp;</span><span class=n>l</span><span class=o>-&gt;</span><span class=n>trap</span><span class=p>)</span> <span class=o>==</span> <span class=mi>0</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=o>//</span> <span class=n>only</span> <span class=n>one</span> <span class=n>thread</span> <span class=n>can</span> <span class=n>set</span> <span class=n>trap</span> <span class=p>(</span> <span class=n>l</span><span class=o>-&gt;</span><span class=n>trap</span> <span class=mi>0</span><span class=o>-&gt;</span><span class=mi>1</span> <span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=k>if</span> <span class=p>(</span><span class=o>!</span><span class=n>ATOM_CAS</span><span class=p>(</span><span class=o>&amp;</span><span class=n>l</span><span class=o>-&gt;</span><span class=n>trap</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>1</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>				<span class=k>return</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>			<span class=n>lua_sethook</span> <span class=p>(</span><span class=n>l</span><span class=o>-&gt;</span><span class=n>activeL</span><span class=p>,</span> <span class=n>signal_hook</span><span class=p>,</span> <span class=n>LUA_MASKCOUNT</span><span class=p>,</span> <span class=mi>1</span><span class=p>);</span>  <span class=o>--</span> <span class=err>相当于</span><span class=n>debug</span><span class=o>.</span><span class=n>sethook</span><span class=p>(</span><span class=n>signal_hook</span><span class=p>,</span> <span class=s2>&#34;count&#34;</span><span class=p>,</span> <span class=mi>1</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=o>//</span> <span class=n>finish</span> <span class=n>set</span> <span class=p>(</span> <span class=n>l</span><span class=o>-&gt;</span><span class=n>trap</span> <span class=mi>1</span> <span class=o>-&gt;</span> <span class=o>-</span><span class=mi>1</span> <span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=n>ATOM_CAS</span><span class=p>(</span><span class=o>&amp;</span><span class=n>l</span><span class=o>-&gt;</span><span class=n>trap</span><span class=p>,</span> <span class=mi>1</span><span class=p>,</span> <span class=o>-</span><span class=mi>1</span><span class=p>);</span>  <span class=o>--</span> <span class=err>设置成功了就将</span><span class=n>trap</span> <span class=err>设置成</span><span class=o>-</span><span class=mi>1</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span> <span class=k>else</span> <span class=k>if</span> <span class=p>(</span><span class=k>signal</span> <span class=o>==</span> <span class=mi>1</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=n>skynet_error</span><span class=p>(</span><span class=n>l</span><span class=o>-&gt;</span><span class=n>ctx</span><span class=p>,</span> <span class=s2>&#34;Current Memory </span><span class=si>%.3f</span><span class=s2>K&#34;</span><span class=p>,</span> <span class=p>(</span><span class=ne>float</span><span class=p>)</span><span class=n>l</span><span class=o>-&gt;</span><span class=n>mem</span> <span class=o>/</span> <span class=mi>1024</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>snlua_signal目前只处理了两个信号事件</p><ul><li>当信号为1的时候，snlua会输出当前的内存使用</li><li>当新号为0的时候，会执行 相当于 相当于debug.sethook(signal_hook, &ldquo;count&rdquo;, 1)的 语句，</li></ul><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=k>static</span> <span class=n>void</span>
+</span></span><span class=line><span class=cl><span class=n>signal_hook</span><span class=p>(</span><span class=n>lua_State</span> <span class=o>*</span><span class=n>L</span><span class=p>,</span> <span class=n>lua_Debug</span> <span class=o>*</span><span class=n>ar</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=n>void</span> <span class=o>*</span><span class=n>ud</span> <span class=o>=</span> <span class=n>NULL</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=n>lua_getallocf</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=o>&amp;</span><span class=n>ud</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=n>struct</span> <span class=n>snlua</span> <span class=o>*</span><span class=n>l</span> <span class=o>=</span> <span class=p>(</span><span class=n>struct</span> <span class=n>snlua</span> <span class=o>*</span><span class=p>)</span><span class=n>ud</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=n>lua_sethook</span> <span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=n>NULL</span><span class=p>,</span> <span class=mi>0</span><span class=p>,</span> <span class=mi>0</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=p>(</span><span class=n>ATOM_LOAD</span><span class=p>(</span><span class=o>&amp;</span><span class=n>l</span><span class=o>-&gt;</span><span class=n>trap</span><span class=p>))</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=n>ATOM_STORE</span><span class=p>(</span><span class=o>&amp;</span><span class=n>l</span><span class=o>-&gt;</span><span class=n>trap</span> <span class=p>,</span> <span class=mi>0</span><span class=p>);</span> <span class=o>--</span> <span class=err>走到这边说明必定触发，则先将</span><span class=n>trap设置会0</span>
+</span></span><span class=line><span class=cl>		<span class=n>luaL_error</span><span class=p>(</span><span class=n>L</span><span class=p>,</span> <span class=s2>&#34;signal 0&#34;</span><span class=p>);</span>  <span class=o>--</span> <span class=err>抛出异常</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>这个signal_hook在执行的时候就会将hook解除，并立即抛出异常。</p><p>还记得在分析线程作用的一章里，有谈到过关于死循环检查的事情吗，当在日志中发现存在死循环后，可以通过给snlua服务发送信号0的方式来打断它的执行，从而跳出死循环。</p><h2 id=snlua_release>snlua_release</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>void
+</span></span><span class=line><span class=cl>snlua_release(struct snlua *l) {
+</span></span><span class=line><span class=cl>	lua_close(l-&gt;L);
+</span></span><span class=line><span class=cl>	skynet_free(l);
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>snlua_release 这边就很简单了，关闭lua的虚拟机、释放对应的内存即可</p><h2 id=小结>小结</h2><p>这边主要过了一下snlua服务中4个主要函数的大致实现。其中比较重要的就是初始化的过程和信号处理的过程。唯一还没理解的地方就是为啥snlua服务需要通过给自己发信息的方式来触发初始化过程。
+snlua在init_cb的时候，代码就来到了lua层，后面就准备分析一些bootstrap.lua中做了什么事情。
+其实snlua这边还有很大篇幅是有关协程调度的（只是hook了调度函数，用来做profile和信号打断的），在源码中定义在init_profile函数里，有机会在分析这块内容。</p></section><footer class=article-footer><section class=article-copyright><svg class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><path d="M14.5 9a3.5 4 0 100 6"/></svg>
+<span>Licensed under CC BY-NC-SA 4.0</span></section><section class=article-lastmod><svg class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<span>Last updated on 2024-08-10 00:00 UTC</span></section></footer></article><aside class=related-content--wrapper><h2 class=section-title>Related content</h2><div class=related-content><div class="flex article-list--tile"><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E5%9B%9B-skynet%E8%BF%9B%E7%A8%8B%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E5%9B%9B-skynet%E8%BF%9B%E7%A8%8B%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十四)-Skynet进程架构总览" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(十四)-Skynet进程架构总览</h2></div></a></article><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十三)-cluster集群" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(十三)-cluster集群</h2></div></a></article><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%BA%8C-skynetluaapi%E5%88%86%E6%9E%90/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%BA%8C-skynetluaapi%E5%88%86%E6%9E%90/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十二)-SkynetLuaApi分析" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(十二)-SkynetLuaApi分析</h2></div></a></article><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%80-bootstrap-%E4%B8%8E-cmaster/cslave/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%80-bootstrap-%E4%B8%8E-cmaster/cslave/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十一)-Bootstrap 与 cmaster/cslave" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(十一)-Bootstrap 与 cmaster/cslave</h2></div></a></article><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%85%AB-skynet%E7%9A%84%E7%BA%BF%E7%A8%8B%E7%B1%BB%E5%9E%8B%E4%B8%89/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%85%AB-skynet%E7%9A%84%E7%BA%BF%E7%A8%8B%E7%B1%BB%E5%9E%8B%E4%B8%89/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(八)-skynet的线程类型（三）" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(八)-skynet的线程类型（三）</h2></div></a></article></div></div></aside><script src=https://utteranc.es/client.js repo=FrozenLychees/FrozenLychees.github.io issue-term=pathname label=comments crossorigin=anonymous async></script><style>.utterances{max-width:unset}</style><script>let utterancesLoaded=!1;function setUtterancesTheme(e){let t=document.querySelector(".utterances iframe");t&&t.contentWindow.postMessage({type:"set-theme",theme:`github-${e}`},"https://utteranc.es")}addEventListener("message",e=>{if(e.origin!=="https://utteranc.es")return;utterancesLoaded=!0,setUtterancesTheme(document.documentElement.dataset.scheme)}),window.addEventListener("onColorSchemeChange",e=>{if(!utterancesLoaded)return;setUtterancesTheme(e.detail)})</script><footer class=site-footer><section class=copyright>&copy;
+2020 -
+2024 FrozenLychees</section><section class=powerby>Built with <a href=https://gohugo.io/ target=_blank rel=noopener>Hugo</a><br>Theme <b><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank rel=noopener data-version=3.26.0>Stack</a></b> designed by <a href=https://jimmycai.com target=_blank rel=noopener>Jimmy</a></section></footer><div class=pswp tabindex=-1 role=dialog aria-hidden=true><div class=pswp__bg></div><div class=pswp__scroll-wrap><div class=pswp__container><div class=pswp__item></div><div class=pswp__item></div><div class=pswp__item></div></div><div class="pswp__ui pswp__ui--hidden"><div class=pswp__top-bar><div class=pswp__counter></div><button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+<button class="pswp__button pswp__button--share" title=Share></button>
+<button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+<button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button><div class=pswp__preloader><div class=pswp__preloader__icn><div class=pswp__preloader__cut><div class=pswp__preloader__donut></div></div></div></div></div><div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap"><div class=pswp__share-tooltip></div></div><button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+</button>
+<button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)"></button><div class=pswp__caption><div class=pswp__caption__center></div></div></div></div></div><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo=" crossorigin=anonymous defer></script><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU=" crossorigin=anonymous defer></script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css crossorigin=anonymous><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css crossorigin=anonymous></main></div><script src=https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z+KMkF24hUW8WePSA9HM=" crossorigin=anonymous></script><script type=text/javascript src=/ts/main.js defer></script><script>(function(){const e=document.createElement("link");e.href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap",e.type="text/css",e.rel="stylesheet",document.head.appendChild(e)})()</script></body></html>

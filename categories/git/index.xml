@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Git on FrozenLychees</title><link>https://frozenlychees.github.io/categories/git/</link><description>Recent content in Git on FrozenLychees</description><generator>Hugo -- gohugo.io</generator><language>en-us</language><lastBuildDate>Fri, 01 Dec 2023 00:00:00 +0000</lastBuildDate><atom:link href="https://frozenlychees.github.io/categories/git/index.xml" rel="self" type="application/rss+xml"/><item><title>Git 原理</title><link>https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/</link><pubDate>Fri, 01 Dec 2023 00:00:00 +0000</pubDate><guid>https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/</guid><description>&lt;img src="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit.png" alt="Featured image of post Git 原理" />&lt;h1 id="git-原理">Git 原理
+&lt;/h1>&lt;p>文章就基于git官方文档的学习笔记，并记录一下在看文档的时候的实验过程，git实验的版本是 git version 2.42.0.windows.1；&lt;/p>
+&lt;p>如果内容有问题或者不正确的地方，欢迎留言讨论。&lt;/p>
+&lt;h2 id="git初始目录">git初始目录
+&lt;/h2>&lt;p>在执行完git init后，.git目录中包含以下文件&lt;/p>
+&lt;ul>
+&lt;li>hooks 用于存放钩子脚本的目录&lt;/li>
+&lt;li>description 用于GitWeb程序使用，文档上说这边不需要关系，那就先跳过&lt;/li>
+&lt;li>config 项目特有的配置信息&lt;/li>
+&lt;li>info 这个目录包含所有不希望记录在.gitignore又需要被忽略的文件&lt;/li>
+&lt;/ul>
+&lt;p>下面四个是比较重要的文件&lt;/p>
+&lt;ul>
+&lt;li>HEAD 该文件指向目前所在的分支&lt;/li>
+&lt;li>index 文件保存暂存区的信息，这个文件在init之初是未被创建的&lt;/li>
+&lt;li>objects 存储所有的数据信息&lt;/li>
+&lt;li>refs 存储指向数据的指针&lt;/li>
+&lt;/ul>
+&lt;h2 id="数据对象">数据对象
+&lt;/h2>&lt;p>git的核心部分可以认为是一个key-vlaue的数据库，在git init初始化的时候，git在objects中创建了两个空的目录，分别是info 和 pack；&lt;/p>
+&lt;p>跟这文档，执行下述命令后，返回一个长度40的校验和&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">echo &amp;#34;test first&amp;#34; | git hash-object -w --stdin
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这个检验和是SHA-1哈希值，通过要存储的信息和一个header信息做SHA-1校验得到的运算结果。&lt;/p>
+&lt;p>命令执行完毕之后，可以看到objects中多了对应的d5文件夹和0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea的文件；可以分析出是用校验和的前两个字符作用目录名，后面38个在字符作为文件名。&lt;/p>
+&lt;p>通过下述命令可以从“git数据库”中得到返回对应的内容&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git cat-file -p d50b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">test first
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>跟着官网的文档，继续使用git hash-object -w往git数据库插入一些数据&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;span class="lnt">11
+&lt;/span>&lt;span class="lnt">12
+&lt;/span>&lt;span class="lnt">13
+&lt;/span>&lt;span class="lnt">14
+&lt;/span>&lt;span class="lnt">15
+&lt;/span>&lt;span class="lnt">16
+&lt;/span>&lt;span class="lnt">17
+&lt;/span>&lt;span class="lnt">18
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ echo &amp;#34;version 1&amp;#34; &amp;gt; test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git hash-object -w test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">83baae61804e65cc73a7201a7252750c76066a30
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ find .git/objects/ -type f
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/83/baae61804e65cc73a7201a7252750c76066a30
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/d5/0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">echo &amp;#34;version 2&amp;#34; &amp;gt; test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git hash-object -w test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">1f7a7a472abf3dd9643fd615f6da379c4acb3e3a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ find .git/objects -type f
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/1f/7a7a472abf3dd9643fd615f6da379c4acb3e3a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/83/baae61804e65cc73a7201a7252750c76066a30
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">.git/objects/d5/0b0140c9fbe1aa26e7e28abf6f3c4ea9cde9ea
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>使用这个方式插入数据的时候，可以看到git status等正常方式是不会有改变的&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;span class="lnt">8
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git status
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">On branch master
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">No commits yet
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">Untracked files:
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> (use &amp;#34;git add &amp;lt;file&amp;gt;...&amp;#34; to include in what will be committed)
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl"> test.txt
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这种方式直接通过git hash-object -w插入的数被称为 数据对象（blob objects），它没有存储对应的文件名字等信息&lt;/p>
+&lt;p>通过git cat-file -t 命令可以看到git存储的内部对象类型&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git cat-file -t 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">blob
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;h2 id="树对象">树对象
+&lt;/h2>&lt;p>树对象的存在是为了解决数据对象中没有名字的问题；&lt;/p>
+&lt;p>使用下面的一系列命令创建出一个树对象&lt;/p>
+&lt;p>首先是提交文件到暂存区&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git update-index --add --cacheinfo 100644 83baae61804e65cc73a7201a7252750c76066a30 test.txt
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>其中&lt;/p>
+&lt;ul>
+&lt;li>&amp;ndash;add是因为这个文件需要首次加入到暂存区；&lt;/li>
+&lt;li>&amp;ndash;cacheinfo 是因为对应的对象是在之前加入到git 数据库中的，而不是目录下的文件；&lt;/li>
+&lt;li>100644 表明加入的是一个普通文件，其他还有选项如10755之类的，具体看官网&lt;/li>
+&lt;li>test.txt是文件名；&lt;/li>
+&lt;/ul>
+&lt;p>提交完毕后通过git write-tree 来创建出对应的树对象&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;span class="lnt">8
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git write-tree 83baae61804e65cc73a7201a7252750c76066a30
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git cat-file -p d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob 83baae61804e65cc73a7201a7252750c76066a30 test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git cat-file -t d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">tree
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>可以看到这个树对象的内容就是之前输入到暂存区的参数；&lt;/p>
+&lt;p>接下来跟着官网实例为test.txt创建新的版本，和新的文件&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt"> 1
+&lt;/span>&lt;span class="lnt"> 2
+&lt;/span>&lt;span class="lnt"> 3
+&lt;/span>&lt;span class="lnt"> 4
+&lt;/span>&lt;span class="lnt"> 5
+&lt;/span>&lt;span class="lnt"> 6
+&lt;/span>&lt;span class="lnt"> 7
+&lt;/span>&lt;span class="lnt"> 8
+&lt;/span>&lt;span class="lnt"> 9
+&lt;/span>&lt;span class="lnt">10
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git update-index --add --cacheinfo 100644 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a test.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ echo &amp;#34;new file&amp;#34; &amp;gt; new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git update-index --add new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git write-tree
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">0155eb4229851634a0f03eb265b69f5a2d56f341
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git cat-file -p 0155eb4229851634a0f03eb265b69f5a2d56f341
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob fa49b077972391ad58037050f2a75f74e3671e92 new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a test.txt
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>在这次的提交中，可以看到生成的树对象内容包含了这次的修改的数据对象指针以及文件内容&lt;/p>
+&lt;p>将之前的树节点读取出来然后提交&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;span class="lnt">7
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git read-tree --prefix=bak d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git write-tree
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">3c4e9cd789d88d8d89c1073707c3585e41b0e614
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ git cat-file -p 3c4e9cd789d88d8d89c1073707c3585e41b0e614
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">040000 tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579 bak
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob fa49b077972391ad58037050f2a75f74e3671e92 new.txt
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">100644 blob 1f7a7a472abf3dd9643fd615f6da379c4acb3e3a test.txt
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>&lt;img src="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/treeObject.png"
+width="800"
+height="593"
+srcset="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/treeObject_hu3808091668821337758.png 480w, https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/treeObject_hu1053160450627988279.png 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="134"
+data-flex-basis="323px"
+>
+到这边我才发现，我的SHA-1内容和官方示例是一样的，不过也确实，因为校验和是根据内容生成的，内容一致，所以结果也一样。&lt;/p>
+&lt;p>做到这边我的疑惑是为什么第三步读入树对象了之后，在git write-tree之后会有new.txt和test.txt；我这边以为git write-tree是对应git commit， 会将暂存区清空的；但后面发现官网文档上有说明git write-tree 只是将当前暂存区对象打包成一个树对象，不会改成暂存区；&lt;/p>
+&lt;h2 id="提交对象">提交对象
+&lt;/h2>&lt;p>提交对象的目的是为了保存什么时候、为什么提交快照信息；&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ echo &amp;#34;first commit&amp;#34; | git commit-tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">3d892437b4885956efeece70e6264534b1aa1785
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>文档还很贴切的在这提示了说因为时间不同，得到的会是不同的SHA-1值&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;span class="lnt">6
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ git cat-file -p fdf4fc3
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">tree d8329fc1cc938780ffdd9f94e0d364e0ea74f579
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">author Scott Chacon &amp;lt;schacon@gmail.com&amp;gt; 1243040974 -0700
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">committer Scott Chacon &amp;lt;schacon@gmail.com&amp;gt; 1243040974 -0700
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">first commit
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>这边按文档的例子来解释，提交对象的头部是一个树对象的SHA, 然后是作者信息，最后是提交注释&lt;/p>
+&lt;p>通过git log &amp;ndash;stat &lt;!-- raw HTML omitted --> 就可以看到一个完整的提交记录&lt;/p>
+&lt;p>如果继续把上述的树对象都提交了，后续的提交需要指定前一个提交作为父对象&lt;/p>
+&lt;div class="highlight">&lt;div class="chroma">
+&lt;table class="lntable">&lt;tr>&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code>&lt;span class="lnt">1
+&lt;/span>&lt;span class="lnt">2
+&lt;/span>&lt;span class="lnt">3
+&lt;/span>&lt;span class="lnt">4
+&lt;/span>&lt;span class="lnt">5
+&lt;/span>&lt;/code>&lt;/pre>&lt;/td>
+&lt;td class="lntd">
+&lt;pre tabindex="0" class="chroma">&lt;code class="language-fallback" data-lang="fallback">&lt;span class="line">&lt;span class="cl">$ echo &amp;#39;second commit&amp;#39; | git commit-tree 0155eb -p 3d892437
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">80869a3e49b9078e1152d6ab8cf14b332e0cac69
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">$ echo &amp;#39;third commit&amp;#39; | git commit-tree 3c4e9c -p 80869a3e
+&lt;/span>&lt;/span>&lt;span class="line">&lt;span class="cl">55ab56f172e9224cc3ed302ff7f74da514d27e11
+&lt;/span>&lt;/span>&lt;/code>&lt;/pre>&lt;/td>&lt;/tr>&lt;/table>
+&lt;/div>
+&lt;/div>&lt;p>最后的结果应该是和文档的图是一致的
+&lt;img src="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit.png"
+width="800"
+height="595"
+srcset="https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit_hu994082283705114117.png 480w, https://frozenlychees.github.io/p/git-%E5%8E%9F%E7%90%86/commit_hu4235838978813405837.png 1024w"
+loading="lazy"
+class="gallery-image"
+data-flex-grow="134"
+data-flex-basis="322px"
+>&lt;/p>
+&lt;h2 id="对象存储">对象存储
+&lt;/h2>&lt;p>git对象的SHA-1 是通过一个header + content组成的；&lt;/p>
+&lt;p>content就是文档内容，而header是通过content的类型和长度生成的，最后将header + content拼接在一起后进行SHA-1得到最后的校验合。
+而content在存储之前会经过zlib压缩。&lt;/p>
+&lt;p>最后存储到文件的时候就是SHA-1作为文件名，zlib压缩的content作为文件内容&lt;/p>
+&lt;h2 id="引用">引用
+&lt;/h2>&lt;ol>
+&lt;li>&lt;a class="link" href="https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-%E5%BA%95%E5%B1%82%E5%91%BD%E4%BB%A4%E4%B8%8E%E4%B8%8A%E5%B1%82%E5%91%BD%E4%BB%A4" target="_blank" rel="noopener"
+>https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-%E5%BA%95%E5%B1%82%E5%91%BD%E4%BB%A4%E4%B8%8E%E4%B8%8A%E5%B1%82%E5%91%BD%E4%BB%A4&lt;/a>&lt;/li>
+&lt;li>&lt;a class="link" href="https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-Git-%E5%AF%B9%E8%B1%A1" target="_blank" rel="noopener"
+>https://git-scm.com/book/zh/v2/Git-%E5%86%85%E9%83%A8%E5%8E%9F%E7%90%86-Git-%E5%AF%B9%E8%B1%A1&lt;/a>&lt;/li>
+&lt;/ol></description></item></channel></rss>

@@ -1,0 +1,817 @@
+<!doctype html><html lang=en-us dir=ltr><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><meta name=description content='Skynet源码阅读笔记-cluster模式分析 项目中主要用到的是cluster模式，这边就简单的分析一下具体它是如何运作的。\ncluster 模型 从途中可以看出clusterd才是cluter集群模式的主体，其中保存了两个主要的数据结构用于发送和接受消息。 从clusterSender 发起的连接会通过gateserver收到并通过clusterd创建的clusterAgent进行消息的处理。\ncluster.lua 在使用的时候，需要将cluster require进来。而 cluster 这个文件本身主要是提供对外接口，在require的时候会执行init，init中调用uniqueserver来生成一个 clusterd 的服务，这个服务才是cluster模式的主体。\nclusterd.lua cluter集群的主体，这边会对处理对其他clusterd的连接和消息处理。\nlisten 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 --- cluster.lua function cluster.open(port, maxclient) if type(port) == "string" then return skynet.call(clusterd, "lua", "listen", port, nil, maxclient) else return skynet.call(clusterd, "lua", "listen", "0.0.0.0", port, maxclient) end end --- clusterd.lua function command.listen(source, addr, port, maxclient) local gate = skynet.newservice("gate") if port == nil then ... else local realaddr, realport = skynet.call(gate, "lua", "open", { address = addr, port = port, maxclient = maxclient }) skynet.ret(skynet.pack(realaddr, realport)) end end 当外部调用open的时候，会转发到clusterd的listen接口，该接口会创建一个gate的service，然后调用gate的open接口，成功后返回实际的地址和端口。\n'><title>Skynet源码阅读笔记(十三)-cluster集群</title>
+<link rel=canonical href=https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/><link rel=stylesheet href=/scss/style.min.0304c6baf04e01a8fe70693791cb744d56a3578a3120a8796cefc66825aa39c7.css><meta property='og:title' content="Skynet源码阅读笔记(十三)-cluster集群"><meta property='og:description' content='Skynet源码阅读笔记-cluster模式分析 项目中主要用到的是cluster模式，这边就简单的分析一下具体它是如何运作的。\ncluster 模型 从途中可以看出clusterd才是cluter集群模式的主体，其中保存了两个主要的数据结构用于发送和接受消息。 从clusterSender 发起的连接会通过gateserver收到并通过clusterd创建的clusterAgent进行消息的处理。\ncluster.lua 在使用的时候，需要将cluster require进来。而 cluster 这个文件本身主要是提供对外接口，在require的时候会执行init，init中调用uniqueserver来生成一个 clusterd 的服务，这个服务才是cluster模式的主体。\nclusterd.lua cluter集群的主体，这边会对处理对其他clusterd的连接和消息处理。\nlisten 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 --- cluster.lua function cluster.open(port, maxclient) if type(port) == "string" then return skynet.call(clusterd, "lua", "listen", port, nil, maxclient) else return skynet.call(clusterd, "lua", "listen", "0.0.0.0", port, maxclient) end end --- clusterd.lua function command.listen(source, addr, port, maxclient) local gate = skynet.newservice("gate") if port == nil then ... else local realaddr, realport = skynet.call(gate, "lua", "open", { address = addr, port = port, maxclient = maxclient }) skynet.ret(skynet.pack(realaddr, realport)) end end 当外部调用open的时候，会转发到clusterd的listen接口，该接口会创建一个gate的service，然后调用gate的open接口，成功后返回实际的地址和端口。\n'><meta property='og:url' content='https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/'><meta property='og:site_name' content='FrozenLychees'><meta property='og:type' content='article'><meta property='article:section' content='Post'><meta property='article:published_time' content='2024-09-02T00:00:00+00:00'><meta property='article:modified_time' content='2024-09-02T00:00:00+00:00'><meta property='og:image' content='https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/skynet.png'><meta name=twitter:title content="Skynet源码阅读笔记(十三)-cluster集群"><meta name=twitter:description content='Skynet源码阅读笔记-cluster模式分析 项目中主要用到的是cluster模式，这边就简单的分析一下具体它是如何运作的。\ncluster 模型 从途中可以看出clusterd才是cluter集群模式的主体，其中保存了两个主要的数据结构用于发送和接受消息。 从clusterSender 发起的连接会通过gateserver收到并通过clusterd创建的clusterAgent进行消息的处理。\ncluster.lua 在使用的时候，需要将cluster require进来。而 cluster 这个文件本身主要是提供对外接口，在require的时候会执行init，init中调用uniqueserver来生成一个 clusterd 的服务，这个服务才是cluster模式的主体。\nclusterd.lua cluter集群的主体，这边会对处理对其他clusterd的连接和消息处理。\nlisten 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 --- cluster.lua function cluster.open(port, maxclient) if type(port) == "string" then return skynet.call(clusterd, "lua", "listen", port, nil, maxclient) else return skynet.call(clusterd, "lua", "listen", "0.0.0.0", port, maxclient) end end --- clusterd.lua function command.listen(source, addr, port, maxclient) local gate = skynet.newservice("gate") if port == nil then ... else local realaddr, realport = skynet.call(gate, "lua", "open", { address = addr, port = port, maxclient = maxclient }) skynet.ret(skynet.pack(realaddr, realport)) end end 当外部调用open的时候，会转发到clusterd的listen接口，该接口会创建一个gate的service，然后调用gate的open接口，成功后返回实际的地址和端口。\n'><meta name=twitter:card content="summary_large_image"><meta name=twitter:image content='https://frozenlychees.github.io/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/skynet.png'><link rel="shortcut icon" href=/favicon.png><script async src="https://www.googletagmanager.com/gtag/js?id=G-KCSZNN6B9X"></script><script>var dnt,doNotTrack=!1;if(!1&&(dnt=navigator.doNotTrack||window.doNotTrack||navigator.msDoNotTrack,doNotTrack=dnt=="1"||dnt=="yes"),!doNotTrack){window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date),gtag("config","G-KCSZNN6B9X")}</script></head><body class=article-page><script>(function(){const e="StackColorScheme";localStorage.getItem(e)||localStorage.setItem(e,"auto")})()</script><script>(function(){const t="StackColorScheme",e=localStorage.getItem(t),n=window.matchMedia("(prefers-color-scheme: dark)").matches===!0;e=="dark"||e==="auto"&&n?document.documentElement.dataset.scheme="dark":document.documentElement.dataset.scheme="light"})()</script><div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky"><button class="hamburger hamburger--spin" type=button id=toggle-menu aria-label="Toggle Menu">
+<span class=hamburger-box><span class=hamburger-inner></span></span></button><header><figure class=site-avatar><a href=/><img src=/img/forzenLychees_hu14353860160155089042.jpg width=300 height=300 class=site-logo loading=lazy alt=Avatar>
+</a><span class=emoji>🍥</span></figure><div class=site-meta><h1 class=site-name><a href=/>FrozenLychees</a></h1><h2 class=site-description>天天摸鱼身体棒</h2></div></header><ol class=menu-social><li><a href=https://github.com/FrozenLychees target=_blank title=GitHub rel=me><svg class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6.0 00-1.3-3.2 4.2 4.2.0 00-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3.0 00-6.2.0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2.0 00-.1 3.2A4.6 4.6.0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a></li><li><a href=https://twitter.com target=_blank title=Twitter rel=me><svg class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-1.265-2.783-1.335-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84.0 00.497-3.753C20.18 7.773 21.692 5.25 22 4.009z"/></svg></a></li></ol><ol class=menu id=main-menu><li><a href=/><svg class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/><path d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"/></svg>
+<span>Home</span></a></li><li><a href=/archives/><svg class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><rect x="3" y="4" width="18" height="4" rx="2"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+<span>Archives</span></a></li><li><a href=/search/><svg class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+<span>Search</span></a></li><li><a href=/links/><svg class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 14a3.5 3.5.0 005 0l4-4a3.5 3.5.0 00-5-5l-.5.5"/><path d="M14 10a3.5 3.5.0 00-5 0l-4 4a3.5 3.5.0 005 5l.5-.5"/></svg>
+<span>Links</span></a></li><li class=menu-bottom-section><ol class=menu><li id=dark-mode-toggle><svg class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="8" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<svg class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="16" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<span>Dark Mode</span></li></ol></li></ol></aside><aside class="sidebar right-sidebar sticky"><section class="widget archives"><div class=widget-icon><svg class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="11" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="13" y2="20"/></svg></div><h2 class="widget-title section-title">Table of contents</h2><div class=widget--toc><nav id=TableOfContents><ol><li><a href=#cluster-模型>cluster 模型</a></li><li><a href=#clusterlua>cluster.lua</a></li><li><a href=#clusterdlua>clusterd.lua</a><ol><li><a href=#listen>listen</a></li><li><a href=#发起连接>发起连接</a></li><li><a href=#open_channel>open_channel</a></li></ol></li><li><a href=#gate-和-gateserver>gate 和 gateServer</a><ol><li><a href=#gateserver>gateServer</a></li><li><a href=#accept>accept</a></li><li><a href=#clusteragent>clusteragent</a></li></ol></li><li><a href=#发送消息>发送消息</a></li><li><a href=#接受消息>接受消息</a><ol><li><a href=#clusteragent-1>clusteragent</a></li></ol></li></ol></nav></div></section></aside><main class="main full-width"><article class="has-image main-article"><header class=article-header><div class=article-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/skynet_hu16783708442478653342.png srcset="/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/skynet_hu16783708442478653342.png 800w, /p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/skynet_hu3423359843825932324.png 1600w" width=800 height=174 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十三)-cluster集群"></a></div><div class=article-details><header class=article-category><a href=/categories/skynet/>Skynet</a></header><div class=article-title-wrapper><h2 class=article-title><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/>Skynet源码阅读笔记(十三)-cluster集群</a></h2></div><footer class=article-time><div><svg class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M11.795 21H5a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v4"/><circle cx="18" cy="18" r="4"/><path d="M15 3v4"/><path d="M7 3v4"/><path d="M3 11h16"/><path d="M18 16.496V18l1 1"/></svg>
+<time class=article-time--published>2024-09-02</time></div><div><svg class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<time class=article-time--reading>8 minute read</time></div></footer></div></header><section class=article-content><h1 id=skynet源码阅读笔记-cluster模式分析>Skynet源码阅读笔记-cluster模式分析</h1><p>项目中主要用到的是cluster模式，这边就简单的分析一下具体它是如何运作的。</p><h2 id=cluster-模型>cluster 模型</h2><p><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/cluster%E9%9B%86%E7%BE%A4.jpg width=1798 height=756 srcset="/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/cluster%E9%9B%86%E7%BE%A4_hu4037574301199394825.jpg 480w, /p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%89-cluster%E9%9B%86%E7%BE%A4/cluster%E9%9B%86%E7%BE%A4_hu5198646295053042214.jpg 1024w" loading=lazy alt=cluster集群 class=gallery-image data-flex-grow=237 data-flex-basis=570px></p><p>从途中可以看出clusterd才是cluter集群模式的主体，其中保存了两个主要的数据结构用于发送和接受消息。 从clusterSender 发起的连接会通过gateserver收到并通过clusterd创建的clusterAgent进行消息的处理。</p><h2 id=clusterlua>cluster.lua</h2><p>在使用的时候，需要将cluster require进来。而 cluster 这个文件本身主要是提供对外接口，在require的时候会执行init，init中调用uniqueserver来生成一个 clusterd 的服务，这个服务才是cluster模式的主体。</p><h2 id=clusterdlua>clusterd.lua</h2><p>cluter集群的主体，这边会对处理对其他clusterd的连接和消息处理。</p><h3 id=listen>listen</h3><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>---  cluster.lua
+</span></span><span class=line><span class=cl>function cluster.open(port, maxclient)
+</span></span><span class=line><span class=cl>	if type(port) == &#34;string&#34; then
+</span></span><span class=line><span class=cl>		return skynet.call(clusterd, &#34;lua&#34;, &#34;listen&#34;, port, nil, maxclient)
+</span></span><span class=line><span class=cl>	else
+</span></span><span class=line><span class=cl>		return skynet.call(clusterd, &#34;lua&#34;, &#34;listen&#34;, &#34;0.0.0.0&#34;, port, maxclient)
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>end
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>--- clusterd.lua
+</span></span><span class=line><span class=cl>function command.listen(source, addr, port, maxclient)
+</span></span><span class=line><span class=cl>	local gate = skynet.newservice(&#34;gate&#34;)
+</span></span><span class=line><span class=cl>	if port == nil then
+</span></span><span class=line><span class=cl>		...
+</span></span><span class=line><span class=cl>	else
+</span></span><span class=line><span class=cl>		local realaddr, realport = skynet.call(gate, &#34;lua&#34;, &#34;open&#34;, { address = addr, port = port, maxclient = maxclient })
+</span></span><span class=line><span class=cl>		skynet.ret(skynet.pack(realaddr, realport))
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>end
+</span></span></code></pre></td></tr></table></div></div><p>当外部调用open的时候，会转发到clusterd的listen接口，该接口会创建一个gate的service，然后调用gate的open接口，成功后返回实际的地址和端口。</p><h3 id=发起连接>发起连接</h3><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=o>---</span>  <span class=n>cluster</span><span class=o>.</span><span class=n>lua</span>
+</span></span><span class=line><span class=cl><span class=n>function</span> <span class=n>cluster</span><span class=o>.</span><span class=n>reload</span><span class=p>(</span><span class=n>config</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=n>skynet</span><span class=o>.</span><span class=n>call</span><span class=p>(</span><span class=n>clusterd</span><span class=p>,</span> <span class=s2>&#34;lua&#34;</span><span class=p>,</span> <span class=s2>&#34;reload&#34;</span><span class=p>,</span> <span class=n>config</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=n>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=o>---</span> <span class=n>clusterd</span><span class=o>.</span><span class=n>lua</span>
+</span></span><span class=line><span class=cl><span class=n>function</span> <span class=n>command</span><span class=o>.</span><span class=n>reload</span><span class=p>(</span><span class=n>source</span><span class=p>,</span> <span class=n>config</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=n>loadconfig</span><span class=p>(</span><span class=n>config</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=n>skynet</span><span class=o>.</span><span class=n>ret</span><span class=p>(</span><span class=n>skynet</span><span class=o>.</span><span class=n>pack</span><span class=p>(</span><span class=n>nil</span><span class=p>))</span>
+</span></span><span class=line><span class=cl><span class=n>end</span>
+</span></span></code></pre></td></tr></table></div></div><p>当调用cluter的reload接口，并传入对应的配置后，相当于调用的是clusterd.loadconfig(config), 这个config的格式是 {name: addr},具体看看loadconfig中做了什么</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=o>---</span> <span class=n>clusterd</span><span class=o>.</span><span class=n>lua</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=n>local</span> <span class=n>node_channel</span> <span class=o>=</span> <span class=n>setmetatable</span><span class=p>({},</span> <span class=p>{</span> <span class=n>__index</span> <span class=o>=</span> <span class=n>open_channel</span> <span class=p>})</span>
+</span></span><span class=line><span class=cl><span class=n>function</span> <span class=n>loadconfig</span><span class=p>(</span><span class=n>tmp</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=n>tmp</span> <span class=o>==</span> <span class=n>nil</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>		<span class=o>...</span> <span class=o>---</span> <span class=err>传入空的时候</span> <span class=err>读环境配置</span>
+</span></span><span class=line><span class=cl>	<span class=n>end</span>
+</span></span><span class=line><span class=cl>	<span class=n>local</span> <span class=n>reload</span> <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=n>name</span><span class=p>,</span><span class=n>address</span> <span class=ow>in</span> <span class=n>pairs</span><span class=p>(</span><span class=n>tmp</span><span class=p>)</span> <span class=k>do</span>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=n>name</span><span class=p>:</span><span class=n>sub</span><span class=p>(</span><span class=mi>1</span><span class=p>,</span><span class=mi>2</span><span class=p>)</span> <span class=o>==</span> <span class=s2>&#34;__&#34;</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>			<span class=o>---</span> <span class=err>特殊开头的名字需要输出一下</span>
+</span></span><span class=line><span class=cl>			<span class=o>....</span>
+</span></span><span class=line><span class=cl>		<span class=k>else</span>
+</span></span><span class=line><span class=cl>			<span class=nb>assert</span><span class=p>(</span><span class=n>address</span> <span class=o>==</span> <span class=bp>false</span> <span class=ow>or</span> <span class=n>type</span><span class=p>(</span><span class=n>address</span><span class=p>)</span> <span class=o>==</span> <span class=s2>&#34;string&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=k>if</span> <span class=n>node_address</span><span class=p>[</span><span class=n>name</span><span class=p>]</span> <span class=o>~=</span> <span class=n>address</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>				<span class=o>--</span> <span class=n>address</span> <span class=n>changed</span>
+</span></span><span class=line><span class=cl>				<span class=o>---</span> <span class=err>原有连接的地址变了</span>
+</span></span><span class=line><span class=cl>				<span class=k>if</span> <span class=n>node_sender</span><span class=p>[</span><span class=n>name</span><span class=p>]</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>					<span class=o>--</span> <span class=n>reset</span> <span class=n>connection</span> <span class=k>if</span> <span class=n>node_sender</span><span class=p>[</span><span class=n>name</span><span class=p>]</span> <span class=n>exist</span>
+</span></span><span class=line><span class=cl>					<span class=n>node_channel</span><span class=p>[</span><span class=n>name</span><span class=p>]</span> <span class=o>=</span> <span class=n>nil</span>
+</span></span><span class=line><span class=cl>					<span class=n>table</span><span class=o>.</span><span class=n>insert</span><span class=p>(</span><span class=n>reload</span><span class=p>,</span> <span class=n>name</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>				<span class=n>end</span>
+</span></span><span class=line><span class=cl>				<span class=n>node_address</span><span class=p>[</span><span class=n>name</span><span class=p>]</span> <span class=o>=</span> <span class=n>address</span>
+</span></span><span class=line><span class=cl>			<span class=n>end</span>
+</span></span><span class=line><span class=cl>			<span class=n>local</span> <span class=n>ct</span> <span class=o>=</span> <span class=n>connecting</span><span class=p>[</span><span class=n>name</span><span class=p>]</span>
+</span></span><span class=line><span class=cl>			<span class=k>if</span> <span class=n>ct</span> <span class=ow>and</span> <span class=n>ct</span><span class=o>.</span><span class=n>namequery</span> <span class=ow>and</span> <span class=ow>not</span> <span class=n>config</span><span class=o>.</span><span class=n>nowaiting</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>				<span class=o>---</span> <span class=err>查询地址的处理</span>
+</span></span><span class=line><span class=cl>				<span class=n>skynet</span><span class=o>.</span><span class=n>error</span><span class=p>(</span><span class=n>string</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=s2>&#34;Cluster node [</span><span class=si>%s</span><span class=s2>] resloved : </span><span class=si>%s</span><span class=s2>&#34;</span><span class=p>,</span> <span class=n>name</span><span class=p>,</span> <span class=n>address</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>				<span class=n>skynet</span><span class=o>.</span><span class=n>wakeup</span><span class=p>(</span><span class=n>ct</span><span class=o>.</span><span class=n>namequery</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=n>end</span>
+</span></span><span class=line><span class=cl>		<span class=n>end</span>
+</span></span><span class=line><span class=cl>	<span class=n>end</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=n>config</span><span class=o>.</span><span class=n>nowaiting</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>		<span class=o>---</span> <span class=err>有设置</span><span class=n>nowaiting的特殊处理</span>
+</span></span><span class=line><span class=cl>		<span class=o>....</span>
+</span></span><span class=line><span class=cl>	<span class=n>end</span>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=n>_</span><span class=p>,</span> <span class=n>name</span> <span class=ow>in</span> <span class=n>ipairs</span><span class=p>(</span><span class=n>reload</span><span class=p>)</span> <span class=k>do</span>
+</span></span><span class=line><span class=cl>		<span class=o>--</span> <span class=n>open_channel</span> <span class=n>would</span> <span class=n>block</span>
+</span></span><span class=line><span class=cl>		<span class=n>skynet</span><span class=o>.</span><span class=n>fork</span><span class=p>(</span><span class=n>open_channel</span><span class=p>,</span> <span class=n>node_channel</span><span class=p>,</span> <span class=n>name</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=n>end</span>
+</span></span><span class=line><span class=cl><span class=n>end</span>
+</span></span></code></pre></td></tr></table></div></div><p>node_address 维护的是名字到地址的映射，node_sender 维护的是名字到sender的映射，当访问不存在的name时，会触发open_channel。</p><p>loadConfig中做的主要是将传入的{name:address}的配置进行处理，如果之前不在node_address 中的，则标记需要连接；如果之前在node_address中的，则说明已经连接上了，需要重新连接。最后对每一个需要连接的配置启动一个协程进行open_channel的操作。</p><h3 id=open_channel>open_channel</h3><p>open_channel 的主要目的就是连接对应的地址</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span><span class=lnt>60
+</span><span class=lnt>61
+</span><span class=lnt>62
+</span><span class=lnt>63
+</span><span class=lnt>64
+</span><span class=lnt>65
+</span><span class=lnt>66
+</span><span class=lnt>67
+</span><span class=lnt>68
+</span><span class=lnt>69
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-gdscript3 data-lang=gdscript3><span class=line><span class=cl><span class=o>---</span> <span class=err>这边</span> <span class=n>t</span> <span class=err>是</span><span class=n>node_channel</span><span class=err>，</span> <span class=n>key是对应name</span>
+</span></span><span class=line><span class=cl><span class=n>local</span> <span class=n>function</span> <span class=n>open_channel</span><span class=p>(</span><span class=n>t</span><span class=p>,</span> <span class=n>key</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=n>local</span> <span class=n>ct</span> <span class=o>=</span> <span class=n>connecting</span><span class=p>[</span><span class=n>key</span><span class=p>]</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=n>ct</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>		<span class=o>...</span> <span class=o>---</span> <span class=err>如果已经在连接了，则这边不会重复连接，协程会被挂起到另一个协程连接完成</span>
+</span></span><span class=line><span class=cl>	<span class=n>end</span>
+</span></span><span class=line><span class=cl>	<span class=n>ct</span> <span class=o>=</span> <span class=p>{}</span>
+</span></span><span class=line><span class=cl>	<span class=n>connecting</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=n>ct</span>
+</span></span><span class=line><span class=cl>	<span class=n>local</span> <span class=n>address</span> <span class=o>=</span> <span class=n>node_address</span><span class=p>[</span><span class=n>key</span><span class=p>]</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=n>address</span> <span class=o>==</span> <span class=n>nil</span> <span class=ow>and</span> <span class=ow>not</span> <span class=n>config</span><span class=o>.</span><span class=n>nowaiting</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>		<span class=o>---</span> <span class=err>如果连接的</span><span class=n>name没有对应的地址</span><span class=err>，则会挂起该协程，直到</span><span class=n>reload</span> <span class=err>对应配置的时候被唤醒</span>
+</span></span><span class=line><span class=cl>		<span class=o>...</span>
+</span></span><span class=line><span class=cl>	<span class=n>end</span>
+</span></span><span class=line><span class=cl>	<span class=n>local</span> <span class=n>succ</span><span class=p>,</span> <span class=n>err</span><span class=p>,</span> <span class=n>c</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=n>address</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>		<span class=n>local</span> <span class=n>host</span><span class=p>,</span> <span class=n>port</span> <span class=o>=</span> <span class=n>string</span><span class=o>.</span><span class=n>match</span><span class=p>(</span><span class=n>address</span><span class=p>,</span> <span class=s2>&#34;([^:]+):(.*)$&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=n>c</span> <span class=o>=</span> <span class=n>node_sender</span><span class=p>[</span><span class=n>key</span><span class=p>]</span>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=n>c</span> <span class=o>==</span> <span class=n>nil</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>			<span class=o>---</span> <span class=err>创建对应的</span><span class=n>sender</span>
+</span></span><span class=line><span class=cl>			<span class=n>c</span> <span class=o>=</span> <span class=n>skynet</span><span class=o>.</span><span class=n>newservice</span><span class=p>(</span><span class=s2>&#34;clustersender&#34;</span><span class=p>,</span> <span class=n>key</span><span class=p>,</span> <span class=n>nodename</span><span class=p>,</span> <span class=n>host</span><span class=p>,</span> <span class=n>port</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=k>if</span> <span class=n>node_sender</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>				<span class=o>--</span> <span class=n>double</span> <span class=n>check</span>
+</span></span><span class=line><span class=cl>				<span class=n>skynet</span><span class=o>.</span><span class=n>kill</span><span class=p>(</span><span class=n>c</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>				<span class=n>c</span> <span class=o>=</span> <span class=n>node_sender</span><span class=p>[</span><span class=n>key</span><span class=p>]</span>
+</span></span><span class=line><span class=cl>			<span class=k>else</span>
+</span></span><span class=line><span class=cl>				<span class=n>node_sender</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=n>c</span>
+</span></span><span class=line><span class=cl>			<span class=n>end</span>
+</span></span><span class=line><span class=cl>		<span class=n>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>		<span class=o>---</span> <span class=err>调用</span><span class=n>sender的changenode</span>
+</span></span><span class=line><span class=cl>		<span class=n>succ</span> <span class=o>=</span> <span class=n>pcall</span><span class=p>(</span><span class=n>skynet</span><span class=o>.</span><span class=n>call</span><span class=p>,</span> <span class=n>c</span><span class=p>,</span> <span class=s2>&#34;lua&#34;</span><span class=p>,</span> <span class=s2>&#34;changenode&#34;</span><span class=p>,</span> <span class=n>host</span><span class=p>,</span> <span class=n>port</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=n>succ</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>			<span class=n>t</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=n>c</span>
+</span></span><span class=line><span class=cl>			<span class=n>ct</span><span class=o>.</span><span class=n>channel</span> <span class=o>=</span> <span class=n>c</span>
+</span></span><span class=line><span class=cl>            <span class=n>node_sender_closed</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=n>nil</span>
+</span></span><span class=line><span class=cl>		<span class=k>else</span>
+</span></span><span class=line><span class=cl>			<span class=n>err</span> <span class=o>=</span> <span class=n>string</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=s2>&#34;changenode [</span><span class=si>%s</span><span class=s2>] (</span><span class=si>%s</span><span class=s2>:</span><span class=si>%s</span><span class=s2>) failed&#34;</span><span class=p>,</span> <span class=n>key</span><span class=p>,</span> <span class=n>host</span><span class=p>,</span> <span class=n>port</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=n>end</span>
+</span></span><span class=line><span class=cl>	<span class=n>elseif</span> <span class=n>address</span> <span class=o>==</span> <span class=bp>false</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>		<span class=n>c</span> <span class=o>=</span> <span class=n>node_sender</span><span class=p>[</span><span class=n>key</span><span class=p>]</span>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=n>c</span> <span class=o>==</span> <span class=n>nil</span> <span class=ow>or</span> <span class=n>node_sender_closed</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>			<span class=o>--</span> <span class=n>no</span> <span class=n>sender</span> <span class=ow>or</span> <span class=n>closed</span><span class=p>,</span> <span class=n>always</span> <span class=n>succ</span>
+</span></span><span class=line><span class=cl>			<span class=n>succ</span> <span class=o>=</span> <span class=bp>true</span>
+</span></span><span class=line><span class=cl>		<span class=k>else</span>
+</span></span><span class=line><span class=cl>			<span class=o>--</span> <span class=n>trun</span> <span class=n>off</span> <span class=n>the</span> <span class=n>sender</span>
+</span></span><span class=line><span class=cl>			<span class=o>---</span> <span class=err>如果地址是</span><span class=bp>false</span><span class=err>，则直接关闭对应的</span><span class=n>sender</span>
+</span></span><span class=line><span class=cl>			<span class=n>succ</span><span class=p>,</span> <span class=n>err</span> <span class=o>=</span> <span class=n>pcall</span><span class=p>(</span><span class=n>skynet</span><span class=o>.</span><span class=n>call</span><span class=p>,</span> <span class=n>c</span><span class=p>,</span> <span class=s2>&#34;lua&#34;</span><span class=p>,</span> <span class=s2>&#34;changenode&#34;</span><span class=p>,</span> <span class=bp>false</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>                        <span class=k>if</span> <span class=n>succ</span> <span class=n>then</span> <span class=o>--</span><span class=n>trun</span> <span class=n>off</span> <span class=n>failed</span><span class=p>,</span> <span class=n>wait</span> <span class=n>next</span> <span class=n>index</span> <span class=n>todo</span> <span class=n>turn</span> <span class=n>off</span>
+</span></span><span class=line><span class=cl>                                <span class=n>node_sender_closed</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=bp>true</span>
+</span></span><span class=line><span class=cl>                        <span class=n>end</span>
+</span></span><span class=line><span class=cl>		<span class=n>end</span>
+</span></span><span class=line><span class=cl>	<span class=k>else</span>
+</span></span><span class=line><span class=cl>		<span class=n>err</span> <span class=o>=</span> <span class=n>string</span><span class=o>.</span><span class=n>format</span><span class=p>(</span><span class=s2>&#34;cluster node [</span><span class=si>%s</span><span class=s2>] is absent.&#34;</span><span class=p>,</span> <span class=n>key</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=n>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>---</span> <span class=err>唤醒所有等待连接的协程</span>
+</span></span><span class=line><span class=cl>	<span class=n>connecting</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=n>nil</span>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=n>_</span><span class=p>,</span> <span class=n>co</span> <span class=ow>in</span> <span class=n>ipairs</span><span class=p>(</span><span class=n>ct</span><span class=p>)</span> <span class=k>do</span>
+</span></span><span class=line><span class=cl>		<span class=n>skynet</span><span class=o>.</span><span class=n>wakeup</span><span class=p>(</span><span class=n>co</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=n>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>---</span> <span class=err>在检查一遍地址，如果不正确则再次连接</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=n>node_address</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>~=</span> <span class=n>address</span> <span class=n>then</span>
+</span></span><span class=line><span class=cl>		<span class=k>return</span> <span class=n>open_channel</span><span class=p>(</span><span class=n>t</span><span class=p>,</span><span class=n>key</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=n>end</span>
+</span></span><span class=line><span class=cl>	<span class=nb>assert</span><span class=p>(</span><span class=n>succ</span><span class=p>,</span> <span class=n>err</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=n>c</span>
+</span></span><span class=line><span class=cl><span class=n>end</span>
+</span></span></code></pre></td></tr></table></div></div><p>open_channel 看起来有点长，实际并不会很复杂。主要目的就是为了创建clustersender，并调用其changenode。这边可以简单认为调用成功的话，就是连接完毕了。</p><h2 id=gate-和-gateserver>gate 和 gateServer</h2><p>现在目光来到gate这边，因为上面发起连接之后，对方处理listen的gate此时应该就会收到对应的信息。</p><p>gate.lua文件里面可以看到实际上这个文件就是一个中间层，提供gateserver到外部的消息接口 以及 外部调用到gateServer的接口。</p><p>在gate 这个文件的最后，执行了</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>local handler = {}
+</span></span><span class=line><span class=cl>gateserver.start(handler)
+</span></span></code></pre></td></tr></table></div></div><p>这个handler是gate.lua中的一个局部变量，用来承接从gateServer中抛出的事件转发给外部用的。</p><p>在clusterd创建geta的时候，还顺便调用了open这个接口</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>function handler.open(source, conf)
+</span></span><span class=line><span class=cl>	watchdog = conf.watchdog or source
+</span></span><span class=line><span class=cl>	return conf.address, conf.port
+</span></span><span class=line><span class=cl>end
+</span></span></code></pre></td></tr></table></div></div><p>open接口内就把clusterd作为watchdog给保存了下来。</p><h3 id=gateserver>gateServer</h3><p>gateServer.lua中也有很多的函数，但不用害怕，绝大多是都是命令，这边初始化的时候就只执行了下面这段代码</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>	...
+</span></span><span class=line><span class=cl>	skynet.register_protocol {
+</span></span><span class=line><span class=cl>		name = &#34;socket&#34;,
+</span></span><span class=line><span class=cl>		id = skynet.PTYPE_SOCKET,	-- PTYPE_SOCKET = 6
+</span></span><span class=line><span class=cl>		unpack = function ( msg, sz )
+</span></span><span class=line><span class=cl>			return netpack.filter( queue, msg, sz)
+</span></span><span class=line><span class=cl>		end,
+</span></span><span class=line><span class=cl>		dispatch = function (_, _, q, type, ...)
+</span></span><span class=line><span class=cl>			queue = q
+</span></span><span class=line><span class=cl>			if type then
+</span></span><span class=line><span class=cl>				MSG[type](...)
+</span></span><span class=line><span class=cl>			end
+</span></span><span class=line><span class=cl>		end
+</span></span><span class=line><span class=cl>	}
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	local function init()
+</span></span><span class=line><span class=cl>		skynet.dispatch(&#34;lua&#34;, function (_, address, cmd, ...)
+</span></span><span class=line><span class=cl>			local f = CMD[cmd]
+</span></span><span class=line><span class=cl>			if f then
+</span></span><span class=line><span class=cl>				skynet.ret(skynet.pack(f(address, ...)))
+</span></span><span class=line><span class=cl>			else
+</span></span><span class=line><span class=cl>				skynet.ret(skynet.pack(handler.command(cmd, address, ...)))
+</span></span><span class=line><span class=cl>			end
+</span></span><span class=line><span class=cl>		end)
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	if handler.embed then
+</span></span><span class=line><span class=cl>		init()
+</span></span><span class=line><span class=cl>	else
+</span></span><span class=line><span class=cl>		skynet.start(init)
+</span></span><span class=line><span class=cl>	end
+</span></span></code></pre></td></tr></table></div></div><p>这边注册了 skynet.PTYPE_SOCKET 这个类型的协议，已经lua 类型的协议的dispatch方式。lua类型的协议搜索空间是CMD，而 skynet.PTYPE_SOCKET 的搜索空间是MSG</p><h3 id=accept>accept</h3><p>当底层收到连接了之后，会抛出连接的信息给到gateServer</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>int 
+</span></span><span class=line><span class=cl>skynet_socket_poll() {
+</span></span><span class=line><span class=cl>	struct socket_server *ss = SOCKET_SERVER;
+</span></span><span class=line><span class=cl>	assert(ss);
+</span></span><span class=line><span class=cl>	struct socket_message result;
+</span></span><span class=line><span class=cl>	int more = 1;
+</span></span><span class=line><span class=cl>	int type = socket_server_poll(ss, &amp;result, &amp;more);
+</span></span><span class=line><span class=cl>	switch (type) {
+</span></span><span class=line><span class=cl>	...
+</span></span><span class=line><span class=cl>	case SOCKET_ACCEPT:
+</span></span><span class=line><span class=cl>		forward_message(SKYNET_SOCKET_TYPE_ACCEPT, true, &amp;result);
+</span></span><span class=line><span class=cl>		break;
+</span></span><span class=line><span class=cl>	}
+</span></span><span class=line><span class=cl>	if (more) {
+</span></span><span class=line><span class=cl>		return -1;
+</span></span><span class=line><span class=cl>	}
+</span></span><span class=line><span class=cl>	return 1;
+</span></span><span class=line><span class=cl>}
+</span></span></code></pre></td></tr></table></div></div><p>forward_message 会将 SOCKET_ACCEPT 包装成 id为 skynet.PTYPE_SOCKET 的信息，其中还会把 skynet_socket_message 的type标记成 SKYNET_SOCKET_TYPE_ACCEPT。</p><p>在gateServer中接到这个消息后，会netpack.filter将其解开，得到对应的type为open，这一步是在lua-netpack.c中处理的。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>	--- gateServer.lua
+</span></span><span class=line><span class=cl>	function MSG.open(fd, msg)
+</span></span><span class=line><span class=cl>		client_number = client_number + 1
+</span></span><span class=line><span class=cl>		if client_number &gt;= maxclient then
+</span></span><span class=line><span class=cl>			socketdriver.shutdown(fd)
+</span></span><span class=line><span class=cl>			return
+</span></span><span class=line><span class=cl>		end
+</span></span><span class=line><span class=cl>		if nodelay then
+</span></span><span class=line><span class=cl>			socketdriver.nodelay(fd)
+</span></span><span class=line><span class=cl>		end
+</span></span><span class=line><span class=cl>		connection[fd] = true
+</span></span><span class=line><span class=cl>		handler.connect(fd, msg)
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	--- gate.lua
+</span></span><span class=line><span class=cl>	function handler.connect(fd, addr)
+</span></span><span class=line><span class=cl>		local c = {
+</span></span><span class=line><span class=cl>			fd = fd,
+</span></span><span class=line><span class=cl>			ip = addr,
+</span></span><span class=line><span class=cl>		}
+</span></span><span class=line><span class=cl>		connection[fd] = c
+</span></span><span class=line><span class=cl>		skynet.send(watchdog, &#34;lua&#34;, &#34;socket&#34;, &#34;open&#34;, fd, addr)
+</span></span><span class=line><span class=cl>	end
+</span></span></code></pre></td></tr></table></div></div><p>gateServer中open最主要的事情也就是将这个事件调出去，而gate中则是将对应的连接保存后，给watchdog发送消息，因为clueted在一开始的时候就将自己设置成了watchdog，所以这边消息就又回到了clusterd上。</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>--- clusterd.lua
+</span></span><span class=line><span class=cl>function command.socket(source, subcmd, fd, msg)
+</span></span><span class=line><span class=cl>	if subcmd == &#34;open&#34; then
+</span></span><span class=line><span class=cl>		skynet.error(string.format(&#34;socket accept from %s&#34;, msg))
+</span></span><span class=line><span class=cl>		-- new cluster agent
+</span></span><span class=line><span class=cl>		cluster_agent[fd] = false
+</span></span><span class=line><span class=cl>		local agent = skynet.newservice(&#34;clusteragent&#34;, skynet.self(), source, fd)
+</span></span><span class=line><span class=cl>		local closed = cluster_agent[fd]
+</span></span><span class=line><span class=cl>		cluster_agent[fd] = agent
+</span></span><span class=line><span class=cl>		if closed then
+</span></span><span class=line><span class=cl>			skynet.send(agent, &#34;lua&#34;, &#34;exit&#34;)
+</span></span><span class=line><span class=cl>			cluster_agent[fd] = nil
+</span></span><span class=line><span class=cl>		end
+</span></span><span class=line><span class=cl>	else
+</span></span><span class=line><span class=cl>		...
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>end
+</span></span></code></pre></td></tr></table></div></div><p>clusterd 上对于这个消息的处理就是将对应cluster_agent给创建出来，如果之前有对应fd的连接信息，则关闭掉之前的。</p><h3 id=clusteragent>clusteragent</h3><p>来到 clueteragent的创建</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=nx>skynet</span><span class=p>.</span><span class=nf>start</span><span class=p>(</span><span class=nf>function</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>---</span> <span class=nx>注册协议</span>
+</span></span><span class=line><span class=cl>	<span class=nx>skynet</span><span class=p>.</span><span class=nx>register_protocol</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>name</span> <span class=p>=</span> <span class=s>&#34;client&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>		<span class=nx>id</span> <span class=p>=</span> <span class=nx>skynet</span><span class=p>.</span><span class=nx>PTYPE_CLIENT</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>		<span class=nx>unpack</span> <span class=p>=</span> <span class=nx>cluster</span><span class=p>.</span><span class=nx>unpackrequest</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>		<span class=nx>dispatch</span> <span class=p>=</span> <span class=nx>dispatch_request</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>--</span> <span class=nx>fd</span> <span class=nx>can</span> <span class=nx>write</span><span class=p>,</span> <span class=nx>but</span> <span class=nx>don</span><span class=err>&#39;</span><span class=nx>t</span> <span class=nx>read</span> <span class=nx>fd</span><span class=p>,</span> <span class=nx>the</span> <span class=nx>data</span> <span class=kn>package</span> <span class=nx>will</span> <span class=nx>forward</span> <span class=nx>from</span> <span class=nx>gate</span> <span class=nx>though</span> <span class=nx>client</span> <span class=nx>protocol</span><span class=p>.</span>
+</span></span><span class=line><span class=cl>	<span class=o>---</span> <span class=nx>此时fd只能写不能读</span><span class=err>，</span><span class=nx>需要通过forward协议完成后续的内容</span>
+</span></span><span class=line><span class=cl>	<span class=nx>skynet</span><span class=p>.</span><span class=nf>call</span><span class=p>(</span><span class=nx>gate</span><span class=p>,</span> <span class=s>&#34;lua&#34;</span><span class=p>,</span> <span class=s>&#34;forward&#34;</span><span class=p>,</span> <span class=nx>fd</span><span class=p>)</span> 
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=o>---</span> <span class=nx>完成disptach的处理</span>
+</span></span><span class=line><span class=cl>	<span class=nx>skynet</span><span class=p>.</span><span class=nf>dispatch</span><span class=p>(</span><span class=s>&#34;lua&#34;</span><span class=p>,</span> <span class=nf>function</span><span class=p>(</span><span class=nx>_</span><span class=p>,</span><span class=nx>source</span><span class=p>,</span> <span class=nx>cmd</span><span class=p>,</span> <span class=o>...</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=nx>cmd</span> <span class=o>==</span> <span class=s>&#34;exit&#34;</span> <span class=nx>then</span>
+</span></span><span class=line><span class=cl>			<span class=nx>socket</span><span class=p>.</span><span class=nf>close_fd</span><span class=p>(</span><span class=nx>fd</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=nx>skynet</span><span class=p>.</span><span class=nf>exit</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>		<span class=nx>elseif</span> <span class=nx>cmd</span> <span class=o>==</span> <span class=s>&#34;namechange&#34;</span> <span class=nx>then</span>
+</span></span><span class=line><span class=cl>			<span class=nx>register_name</span> <span class=p>=</span> <span class=nf>new_register_name</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>		<span class=k>else</span>
+</span></span><span class=line><span class=cl>			<span class=nx>skynet</span><span class=p>.</span><span class=nb>error</span><span class=p>(</span><span class=kt>string</span><span class=p>.</span><span class=nf>format</span><span class=p>(</span><span class=s>&#34;Invalid command %s from %s&#34;</span><span class=p>,</span> <span class=nx>cmd</span><span class=p>,</span> <span class=nx>skynet</span><span class=p>.</span><span class=nf>address</span><span class=p>(</span><span class=nx>source</span><span class=p>)))</span>
+</span></span><span class=line><span class=cl>		<span class=nx>end</span>
+</span></span><span class=line><span class=cl>	<span class=nx>end</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=nx>end</span><span class=p>)</span>
+</span></span></code></pre></td></tr></table></div></div><p>clusteragent在创建的时候有一个特殊的处理是给gate发送了一个forward 的协议，发送forward之后会导致gate的连接状态更新，把连接的agent更新成clusteragent。同时也会让底层更新对应的socket状态</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=o>---</span> <span class=nx>gate</span><span class=p>.</span><span class=nx>lua</span>
+</span></span><span class=line><span class=cl><span class=nx>function</span> <span class=nx>CMD</span><span class=p>.</span><span class=nf>forward</span><span class=p>(</span><span class=nx>source</span><span class=p>,</span> <span class=nx>fd</span><span class=p>,</span> <span class=nx>client</span><span class=p>,</span> <span class=nx>address</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=nx>local</span> <span class=nx>c</span> <span class=p>=</span> <span class=nf>assert</span><span class=p>(</span><span class=nx>connection</span><span class=p>[</span><span class=nx>fd</span><span class=p>])</span>
+</span></span><span class=line><span class=cl>	<span class=nf>unforward</span><span class=p>(</span><span class=nx>c</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=nx>c</span><span class=p>.</span><span class=nx>client</span> <span class=p>=</span> <span class=nx>client</span> <span class=nx>or</span> <span class=mi>0</span>
+</span></span><span class=line><span class=cl>	<span class=nx>c</span><span class=p>.</span><span class=nx>agent</span> <span class=p>=</span> <span class=nx>address</span> <span class=nx>or</span> <span class=nx>source</span>
+</span></span><span class=line><span class=cl>	<span class=nx>gateserver</span><span class=p>.</span><span class=nf>openclient</span><span class=p>(</span><span class=nx>fd</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=nx>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=o>---</span> <span class=nx>gateserver</span><span class=p>.</span><span class=nx>lua</span>
+</span></span><span class=line><span class=cl><span class=nx>function</span> <span class=nx>gateserver</span><span class=p>.</span><span class=nf>openclient</span><span class=p>(</span><span class=nx>fd</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=nx>connection</span><span class=p>[</span><span class=nx>fd</span><span class=p>]</span> <span class=nx>then</span>
+</span></span><span class=line><span class=cl>		<span class=nx>socketdriver</span><span class=p>.</span><span class=nf>start</span><span class=p>(</span><span class=nx>fd</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=nx>end</span>
+</span></span><span class=line><span class=cl><span class=nx>end</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=o>---</span> <span class=nx>lua</span><span class=o>-</span><span class=nx>socket</span><span class=p>.</span><span class=nx>c</span>
+</span></span><span class=line><span class=cl><span class=nx>void</span>
+</span></span><span class=line><span class=cl><span class=nf>socket_server_start</span><span class=p>(</span><span class=kd>struct</span> <span class=nx>socket_server</span> <span class=o>*</span><span class=nx>ss</span><span class=p>,</span> <span class=nx>uintptr_t</span> <span class=nx>opaque</span><span class=p>,</span> <span class=kt>int</span> <span class=nx>id</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=kd>struct</span> <span class=nx>request_package</span> <span class=nx>request</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=nx>request</span><span class=p>.</span><span class=nx>u</span><span class=p>.</span><span class=nx>resumepause</span><span class=p>.</span><span class=nx>id</span> <span class=p>=</span> <span class=nx>id</span><span class=p>;</span> <span class=o>---</span> <span class=nx>这个id</span> <span class=nx>就是</span> <span class=nx>lua传进来的fd</span>
+</span></span><span class=line><span class=cl>	<span class=nx>request</span><span class=p>.</span><span class=nx>u</span><span class=p>.</span><span class=nx>resumepause</span><span class=p>.</span><span class=nx>opaque</span> <span class=p>=</span> <span class=nx>opaque</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=nf>send_request</span><span class=p>(</span><span class=nx>ss</span><span class=p>,</span> <span class=o>&amp;</span><span class=nx>request</span><span class=p>,</span> <span class=sc>&#39;R&#39;</span><span class=p>,</span> <span class=nf>sizeof</span><span class=p>(</span><span class=nx>request</span><span class=p>.</span><span class=nx>u</span><span class=p>.</span><span class=nx>resumepause</span><span class=p>));</span>  <span class=o>---</span> <span class=nx>这边给socket_server</span><span class=p>.</span><span class=nx>c发送</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=o>---</span> <span class=nx>socket_server</span><span class=p>.</span><span class=nx>c</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=nx>static</span> <span class=kt>int</span>
+</span></span><span class=line><span class=cl><span class=nf>resume_socket</span><span class=p>(</span><span class=kd>struct</span> <span class=nx>socket_server</span> <span class=o>*</span><span class=nx>ss</span><span class=p>,</span> <span class=kd>struct</span> <span class=nx>request_resumepause</span> <span class=o>*</span><span class=nx>request</span><span class=p>,</span> <span class=kd>struct</span> <span class=nx>socket_message</span> <span class=o>*</span><span class=nx>result</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=kt>int</span> <span class=nx>id</span> <span class=p>=</span> <span class=nx>request</span><span class=o>-</span><span class=p>&gt;</span><span class=nx>id</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=o>...</span> <span class=o>---</span> <span class=nx>处理一些特殊的异常情况</span>
+</span></span><span class=line><span class=cl>	<span class=nx>uint8_t</span> <span class=kd>type</span> <span class=p>=</span> <span class=nf>ATOM_LOAD</span><span class=p>(</span><span class=o>&amp;</span><span class=nx>s</span><span class=o>-</span><span class=p>&gt;</span><span class=kd>type</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=p>(</span><span class=kd>type</span> <span class=o>==</span> <span class=nx>SOCKET_TYPE_PACCEPT</span> <span class=o>||</span> <span class=kd>type</span> <span class=o>==</span> <span class=nx>SOCKET_TYPE_PLISTEN</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nf>ATOM_STORE</span><span class=p>(</span><span class=o>&amp;</span><span class=nx>s</span><span class=o>-</span><span class=p>&gt;</span><span class=kd>type</span> <span class=p>,</span> <span class=p>(</span><span class=kd>type</span> <span class=o>==</span> <span class=nx>SOCKET_TYPE_PACCEPT</span><span class=p>)</span> <span class=err>?</span> <span class=nx>SOCKET_TYPE_CONNECTED</span> <span class=p>:</span> <span class=nx>SOCKET_TYPE_LISTEN</span><span class=p>);</span>
+</span></span><span class=line><span class=cl>		<span class=nx>s</span><span class=o>-</span><span class=p>&gt;</span><span class=nx>opaque</span> <span class=p>=</span> <span class=nx>request</span><span class=o>-</span><span class=p>&gt;</span><span class=nx>opaque</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>		<span class=nx>result</span><span class=o>-</span><span class=p>&gt;</span><span class=nx>data</span> <span class=p>=</span> <span class=s>&#34;start&#34;</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>		<span class=k>return</span> <span class=nx>SOCKET_OPEN</span><span class=p>;</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span> 
+</span></span><span class=line><span class=cl>	<span class=o>...</span> <span class=o>---</span> <span class=nx>处理一些特殊的异常情况</span>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=o>-</span><span class=mi>1</span><span class=p>;</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>forward 信息最后回到底层之后，正常情况下会修改对应socket的信息，将type变成 SOCKET_TYPE_CONNECTED.</p><h2 id=发送消息>发送消息</h2><p>当我们要发送消息的时候，使用的是 cluster.call 这个接口</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>--- cluster.lua
+</span></span><span class=line><span class=cl>function cluster.call(node, address, ...)
+</span></span><span class=line><span class=cl>	-- skynet.pack(...) will free by cluster.core.packrequest
+</span></span><span class=line><span class=cl>	local s = sender[node]
+</span></span><span class=line><span class=cl>	if not s then
+</span></span><span class=line><span class=cl>		--- 还没有的时候会进行等待处理
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>	return skynet.call(s, &#34;lua&#34;, &#34;req&#34;, address, skynet.pack(...))
+</span></span><span class=line><span class=cl>end
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>--- clusterSender.lua
+</span></span><span class=line><span class=cl>function command.req(...)
+</span></span><span class=line><span class=cl>	local ok, msg = pcall(send_request, ...)
+</span></span><span class=line><span class=cl>	if ok then
+</span></span><span class=line><span class=cl>		if type(msg) == &#34;table&#34; then
+</span></span><span class=line><span class=cl>			skynet.ret(cluster.concat(msg))
+</span></span><span class=line><span class=cl>		else
+</span></span><span class=line><span class=cl>			skynet.ret(msg)
+</span></span><span class=line><span class=cl>		end
+</span></span><span class=line><span class=cl>	else
+</span></span><span class=line><span class=cl>		skynet.error(msg)
+</span></span><span class=line><span class=cl>		skynet.response()(false)
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>end
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>local function send_request(addr, msg, sz)
+</span></span><span class=line><span class=cl>	-- msg is a local pointer, cluster.packrequest will free it
+</span></span><span class=line><span class=cl>	local current_session = session
+</span></span><span class=line><span class=cl>	local request, new_session, padding = cluster.packrequest(addr, session, msg, sz)
+</span></span><span class=line><span class=cl>	session = new_session
+</span></span><span class=line><span class=cl>	....
+</span></span><span class=line><span class=cl>	return channel:request(request, current_session, padding)
+</span></span><span class=line><span class=cl>end
+</span></span></code></pre></td></tr></table></div></div><p>这个接口是通过node来找到对应的sender，最终通过channel的request来发送数据，这边可以认为就是给对应的fd发送数据。</p><h2 id=接受消息>接受消息</h2><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>--- gateserver.lua
+</span></span><span class=line><span class=cl>local function dispatch_msg(fd, msg, sz)
+</span></span><span class=line><span class=cl>	if connection[fd] then
+</span></span><span class=line><span class=cl>		handler.message(fd, msg, sz)
+</span></span><span class=line><span class=cl>	else
+</span></span><span class=line><span class=cl>		skynet.error(string.format(&#34;Drop message from fd (%d) : %s&#34;, fd, netpack.tostring(msg,sz)))
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>end
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>MSG.data = dispatch_msg
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>--- gate.lua
+</span></span><span class=line><span class=cl>function handler.message(fd, msg, sz)
+</span></span><span class=line><span class=cl>	-- recv a package, forward it
+</span></span><span class=line><span class=cl>	local c = connection[fd]
+</span></span><span class=line><span class=cl>	local agent = c.agent
+</span></span><span class=line><span class=cl>	if agent then
+</span></span><span class=line><span class=cl>		-- 这边就是clusteragent
+</span></span><span class=line><span class=cl>		-- It&#39;s safe to redirect msg directly , gateserver framework will not free msg.
+</span></span><span class=line><span class=cl>		skynet.redirect(agent, c.client, &#34;client&#34;, fd, msg, sz)
+</span></span><span class=line><span class=cl>	else
+</span></span><span class=line><span class=cl>		skynet.send(watchdog, &#34;lua&#34;, &#34;socket&#34;, &#34;data&#34;, fd, skynet.tostring(msg, sz))
+</span></span><span class=line><span class=cl>		-- skynet.tostring will copy msg to a string, so we must free msg here.
+</span></span><span class=line><span class=cl>		skynet.trash(msg,sz)
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>end
+</span></span></code></pre></td></tr></table></div></div><p>在gateserver.lua中接受消息后 调用的是MSG.data 接口，这边会调用handler的message，转发给对应的clusteragent, 这边转发的消息类型会变成client</p><h3 id=clusteragent-1>clusteragent</h3><p>在clueteragent中，对于client的消息是通过dispatch_request进行处理</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-fallback data-lang=fallback><span class=line><span class=cl>local function dispatch_request(_,_,addr, session, msg, sz, padding, is_push)
+</span></span><span class=line><span class=cl>	...
+</span></span><span class=line><span class=cl>	local ok, response
+</span></span><span class=line><span class=cl>	if addr == 0 then
+</span></span><span class=line><span class=cl>		... ---  查询名字相关
+</span></span><span class=line><span class=cl>	else
+</span></span><span class=line><span class=cl>		if cluster.isname(addr) then
+</span></span><span class=line><span class=cl>			addr = register_name[addr]
+</span></span><span class=line><span class=cl>		end
+</span></span><span class=line><span class=cl>		if addr then
+</span></span><span class=line><span class=cl>			if is_push then
+</span></span><span class=line><span class=cl>				skynet.rawsend(addr, &#34;lua&#34;, msg, sz)
+</span></span><span class=line><span class=cl>				return	-- no response
+</span></span><span class=line><span class=cl>			else
+</span></span><span class=line><span class=cl>				...
+</span></span><span class=line><span class=cl>				ok , msg, sz = pcall(skynet.rawcall, addr, &#34;lua&#34;, msg, sz)
+</span></span><span class=line><span class=cl>			end
+</span></span><span class=line><span class=cl>		else
+</span></span><span class=line><span class=cl>			ok = false
+</span></span><span class=line><span class=cl>			msg = &#34;Invalid name&#34;
+</span></span><span class=line><span class=cl>		end
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>	if ok then
+</span></span><span class=line><span class=cl>		--- 打包回包数据
+</span></span><span class=line><span class=cl>		response = cluster.packresponse(session, true, msg, sz)
+</span></span><span class=line><span class=cl>		if type(response) == &#34;table&#34; then
+</span></span><span class=line><span class=cl>			for _, v in ipairs(response) do
+</span></span><span class=line><span class=cl>				socket.lwrite(fd, v)
+</span></span><span class=line><span class=cl>			end
+</span></span><span class=line><span class=cl>		else
+</span></span><span class=line><span class=cl>			socket.write(fd, response)
+</span></span><span class=line><span class=cl>		end
+</span></span><span class=line><span class=cl>	else
+</span></span><span class=line><span class=cl>		response = cluster.packresponse(session, false, msg)
+</span></span><span class=line><span class=cl>		socket.write(fd, response)
+</span></span><span class=line><span class=cl>	end
+</span></span><span class=line><span class=cl>end
+</span></span></code></pre></td></tr></table></div></div><p>这边化简后的代码如上，总的来说就是解析对应的数据，然后发送给对应的名字的服务，这个名字需要由其他服务主动来注册。调用完毕之后就会将数据打包，然后通过对应的socket write的方式将回包数据写入fd中。</p><h1 id=小结>小结</h1><p>这边基本把 cluster模式中几个比较重要的事情以源码分析的方式都分析了一下，虽然篇幅较长，但我感觉只要耐心看完应该会由收获。不过我个人没有get到为什么要读写分离成sender和agent的方式，可能是为了复用先用代码是新的一些功能？如果由我来实现的话，我可能会将这两个写在同一个结构内，感觉会更加统一一点。</p></section><footer class=article-footer><section class=article-copyright><svg class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><path d="M14.5 9a3.5 4 0 100 6"/></svg>
+<span>Licensed under CC BY-NC-SA 4.0</span></section><section class=article-lastmod><svg class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<span>Last updated on 2024-09-02 00:00 UTC</span></section></footer></article><aside class=related-content--wrapper><h2 class=section-title>Related content</h2><div class=related-content><div class="flex article-list--tile"><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E5%9B%9B-skynet%E8%BF%9B%E7%A8%8B%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E5%9B%9B-skynet%E8%BF%9B%E7%A8%8B%E6%9E%B6%E6%9E%84%E6%80%BB%E8%A7%88/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十四)-Skynet进程架构总览" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(十四)-Skynet进程架构总览</h2></div></a></article><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%BA%8C-skynetluaapi%E5%88%86%E6%9E%90/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%BA%8C-skynetluaapi%E5%88%86%E6%9E%90/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十二)-SkynetLuaApi分析" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(十二)-SkynetLuaApi分析</h2></div></a></article><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%80-bootstrap-%E4%B8%8E-cmaster/cslave/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81%E4%B8%80-bootstrap-%E4%B8%8E-cmaster/cslave/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十一)-Bootstrap 与 cmaster/cslave" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(十一)-Bootstrap 与 cmaster/cslave</h2></div></a></article><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%8D%81-snlua-%E6%9C%8D%E5%8A%A1/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(十)- Snlua 服务" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(十)- Snlua 服务</h2></div></a></article><article class=has-image><a href=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%85%AB-skynet%E7%9A%84%E7%BA%BF%E7%A8%8B%E7%B1%BB%E5%9E%8B%E4%B8%89/><div class=article-image><img src=/p/skynet%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E7%AC%94%E8%AE%B0%E5%85%AB-skynet%E7%9A%84%E7%BA%BF%E7%A8%8B%E7%B1%BB%E5%9E%8B%E4%B8%89/skynet.b33fc77655cb8470ab9dd6e90a010b07_hu7627139051942806488.png width=250 height=150 loading=lazy alt="Featured image of post Skynet源码阅读笔记(八)-skynet的线程类型（三）" data-hash="md5-sz/HdlXLhHCrndbpCgELBw=="></div><div class=article-details><h2 class=article-title>Skynet源码阅读笔记(八)-skynet的线程类型（三）</h2></div></a></article></div></div></aside><script src=https://utteranc.es/client.js repo=FrozenLychees/FrozenLychees.github.io issue-term=pathname label=comments crossorigin=anonymous async></script><style>.utterances{max-width:unset}</style><script>let utterancesLoaded=!1;function setUtterancesTheme(e){let t=document.querySelector(".utterances iframe");t&&t.contentWindow.postMessage({type:"set-theme",theme:`github-${e}`},"https://utteranc.es")}addEventListener("message",e=>{if(e.origin!=="https://utteranc.es")return;utterancesLoaded=!0,setUtterancesTheme(document.documentElement.dataset.scheme)}),window.addEventListener("onColorSchemeChange",e=>{if(!utterancesLoaded)return;setUtterancesTheme(e.detail)})</script><footer class=site-footer><section class=copyright>&copy;
+2020 -
+2024 FrozenLychees</section><section class=powerby>Built with <a href=https://gohugo.io/ target=_blank rel=noopener>Hugo</a><br>Theme <b><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank rel=noopener data-version=3.26.0>Stack</a></b> designed by <a href=https://jimmycai.com target=_blank rel=noopener>Jimmy</a></section></footer><div class=pswp tabindex=-1 role=dialog aria-hidden=true><div class=pswp__bg></div><div class=pswp__scroll-wrap><div class=pswp__container><div class=pswp__item></div><div class=pswp__item></div><div class=pswp__item></div></div><div class="pswp__ui pswp__ui--hidden"><div class=pswp__top-bar><div class=pswp__counter></div><button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+<button class="pswp__button pswp__button--share" title=Share></button>
+<button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+<button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button><div class=pswp__preloader><div class=pswp__preloader__icn><div class=pswp__preloader__cut><div class=pswp__preloader__donut></div></div></div></div></div><div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap"><div class=pswp__share-tooltip></div></div><button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+</button>
+<button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)"></button><div class=pswp__caption><div class=pswp__caption__center></div></div></div></div></div><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo=" crossorigin=anonymous defer></script><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU=" crossorigin=anonymous defer></script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css crossorigin=anonymous><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css crossorigin=anonymous></main></div><script src=https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z+KMkF24hUW8WePSA9HM=" crossorigin=anonymous></script><script type=text/javascript src=/ts/main.js defer></script><script>(function(){const e=document.createElement("link");e.href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap",e.type="text/css",e.rel="stylesheet",document.head.appendChild(e)})()</script></body></html>
