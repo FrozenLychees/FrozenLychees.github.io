@@ -9,6 +9,60 @@ categories:
 ---
 
 # Lua 源码阅读笔记-函数调用过程 
+
+先来看一段Lua代码和对应的字节码
+
+```
+function f1(a, b , c)
+    return c + a , b + a
+end 
+
+function <test/test_call.lua:3,5> (6 instructions at 0x55d992393f40)
+3 params, 5 slots, 0 upvalues, 3 locals, 0 constants, 0 functions
+        1       [4]     ADD             3 2 0
+        2       [4]     MMBIN           2 0 6   ; __add
+        3       [4]     ADD             4 1 0
+        4       [4]     MMBIN           1 0 6   ; __add
+        5       [4]     RETURN          3 3 0   ; 2 out
+        6       [5]     RETURN0  
+
+
+
+function call(a, b, c)
+    local x, y = f1(a, b, c)
+    return x, y
+end
+
+
+function <test/test_call.lua:7,10> (9 instructions at 0x55d9923942e0)
+3 params, 7 slots, 1 upvalue, 5 locals, 1 constant, 0 functions
+        1       [8]     GETTABUP        3 0 0   ; _ENV "f1"  将f1 函数拷贝到 3寄存器
+        2       [8]     MOVE            4 0    // 移动A到4 寄存器
+        3       [8]     MOVE            5 1    // 移动B到5 寄存器
+        4       [8]     MOVE            6 2    // 移动C到6 寄存器
+        5       [8]     CALL            3 4 3   ; 3 in 2 out   /*	A B C	R[A], ... ,R[A+C-2] := R[A](R[A+1], ... ,R[A+B-1]) */
+        6       [9]     MOVE            5 3    // 将3 寄存器的东西拷贝到5 寄存器
+        7       [9]     MOVE            6 4    // 将4 寄存器的东西拷贝到6 寄存器
+        8       [9]     RETURN          5 3 0   ; 2 out  /*	A B C k	return R[A], ... ,R[A+B-2]	(see note)	*/
+        9       [10]    RETURN0  
+
+
+
+function tailCall(a, b, c)
+    return f1(a, b, c)
+end 
+
+function <test/test_call.lua:12,14> (7 instructions at 0x55d992394880)
+3 params, 7 slots, 1 upvalue, 3 locals, 1 constant, 0 functions
+        1       [13]    GETTABUP        3 0 0   ; _ENV "f1"
+        2       [13]    MOVE            4 0   // 移动A到4 寄存器
+        3       [13]    MOVE            5 1   // 移动B到5 寄存器
+        4       [13]    MOVE            6 2   // 移动C到6 寄存器
+        5       [13]    TAILCALL        3 4 0   ; 3 in  /*  A B C k return R[A](R[A+1], ... ,R[A+B-1])              */
+        6       [13]    RETURN          3 0 0   ; all out
+        7       [14]    RETURN0  
+
+```
 在Lua中，函数调用对应的字节码分为 OP_CALL 和 OP_TAIL_CALL, 接下来就分析一下这两个操作码对应的实现
 
 ## OP_CALL
