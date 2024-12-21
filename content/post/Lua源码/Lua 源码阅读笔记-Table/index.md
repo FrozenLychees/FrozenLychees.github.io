@@ -35,11 +35,14 @@ typedef struct Table {
 } Table;
 ```
 
-flags
 lsizenode: log2(字典大小) 的结果， 这边也还说明作为字典的时候，大小一定是2的倍数
+
 alimit:  看起来是数组的大小，但不一定时准确的数组大小
+
 array： 当table是数组时，指向使用的内存位置
+
 node: 当table是字典时，指向使用的内存位置
+
 lastfree: 当table刚申请的时候，指向table的末尾，冲突时会向前移动这个指针，找到一个空闲的位置
 
 metatable: 指向这个表的原表
@@ -205,10 +208,12 @@ luaH_newkey 函数比较长，建议对照源码来看.
     othern = mainpositionfromnode(t, mp);
     if (othern != mp) {  /* is colliding node out of its main position? */
       /* yes; move colliding node into free position */
-      // 将碰撞的元素找到一个新的位置插入
+      // 如果碰撞元素的主位置不是在这里，则通过碰撞元素的链表头部, 找到链表上的前一个节点
       while (othern + gnext(othern) != mp)  /* find previous */
         othern += gnext(othern);
+      // 更新前一个节点的next值
       gnext(othern) = cast_int(f - othern);  /* rechain to point to 'f' */
+
       *f = *mp;  /* copy colliding node into free pos. (mp->next also goes) */
       // 将新元素插入到原来碰撞元素的位置
       if (gnext(mp) != 0) {
@@ -232,7 +237,7 @@ luaH_newkey 函数比较长，建议对照源码来看.
 
 lua的table和其他dict实现的有点不太一样，以Python为例子，Python的hash表实现是hash表和元素节点的内存是分开的，hash表中存的是元素的链表。但Lua中hash表和元素是共用内存的，即hash表存的就是元素。
 
-而且冲突的时候的处理也挺不一致的。python因为元素内存是额外申请的，所以找到位置后直接修改链表即可。而Lua在冲突的时候，是通过lastfree指针在hash表从后往前找一个空闲的元素位置，然后根据冲突节点来判断这个空闲的位置到底是给新节点还是冲突节点。
+虽然lua在冲突的是也是用链表法解决的，但python因为元素内存是额外申请的，所以找到位置后直接修改链表即可。而Lua在冲突的时候，是通过lastfree指针在hash表从后往前找一个空闲的元素位置，然后根据冲突节点来判断这个空闲的位置到底是给新节点还是冲突节点，并更新冲突节点或者新节点的整条链表。
 
 感觉这种实现的话，应该是为内存效率做考虑，但代价就是冲突处理的效率肯定是低于其他实现的，同时table删除元素是将对应的value修改成nil来实现的，所以lastfree指针只会不断向前，对于会频繁增删的hash表来说，应该是会造成rehash的次数上涨的。
 
